@@ -12,6 +12,7 @@ import com.wire.xenon.crypto.storage.JdbiStorage;
 import com.wire.xenon.factories.CryptoFactory;
 import com.wire.xenon.factories.StorageFactory;
 import com.wire.xenon.models.AssetKey;
+import com.wire.xenon.models.ImageMessage;
 import com.wire.xenon.models.TextMessage;
 import com.wire.xenon.state.JdbiState;
 import com.wire.xenon.tools.Logger;
@@ -59,7 +60,17 @@ public class ApplicationTest {
         final MessageHandlerBase messageHandlerBase = new MessageHandlerBase() {
             @Override
             public void onText(WireClient client, TextMessage msg) {
-                Logger.info("onText: %s", msg.getText());
+                Logger.info("onText: received: %s", msg.getText());
+            }
+
+            @Override
+            public void onImage(WireClient client, ImageMessage msg) {
+                Logger.info("onImage: received: %d bytes, %s", msg.getSize(), msg.getMimeType());
+                try {
+                    final byte[] bytes = client.downloadAsset(msg.getAssetKey(), msg.getAssetToken(), msg.getSha256(), msg.getOtrKey());
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         };
 
@@ -84,7 +95,9 @@ public class ApplicationTest {
         wireClient = app.getWireClient(conv.id);
 
         // Add Echo bot into this conv (code: 59d7abe5-3850-4b34-8fe5-0bcd4bfad4e6:aba311a6-fb14-46c9-af1b-3cb454762ef2)
-        wireClient.addService(UUID.fromString("aba311a6-fb14-46c9-af1b-3cb454762ef2"), UUID.fromString("59d7abe5-3850-4b34-8fe5-0bcd4bfad4e6"));
+        final UUID serviceId = UUID.fromString("aba311a6-fb14-46c9-af1b-3cb454762ef2");
+        final UUID providerId = UUID.fromString("59d7abe5-3850-4b34-8fe5-0bcd4bfad4e6");
+        wireClient.addService(serviceId, providerId);
 
         // Send text
         wireClient.send(new MessageText("Hi there!"));

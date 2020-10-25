@@ -250,6 +250,7 @@ public class API extends LoginClient implements WireAPI {
                 path(convId).
                 path("bots").
                 request().
+                accept(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 post(Entity.entity(service, MediaType.APPLICATION_JSON));
 
