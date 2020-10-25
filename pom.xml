@@ -13,6 +13,19 @@
         <maven.test.skip>true</maven.test.skip>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>xenon</id>
+            <url>https://packagecloud.io/dkovacevic/xenon/maven2</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>com.wire</groupId>
@@ -100,4 +113,18 @@
             </plugin>
         </plugins>
     </build>
+    <distributionManagement>
+        <repository>
+            <id>packagecloud-dkovacevic</id>
+            <url>
+                packagecloud+https://packagecloud.io/dkovacevic/helium
+            </url>
+        </repository>
+        <snapshotRepository>
+            <id>packagecloud-dkovacevic</id>
+            <url>
+                packagecloud+https://packagecloud.io/dkovacevic/helium
+            </url>
+        </snapshotRepository>
+    </distributionManagement>
 </project>
