@@ -245,7 +245,7 @@ public class Application {
         return userId;
     }
 
-    public UserClient getWireClient(UUID conversationId) throws CryptoException, IOException {
+    public WireClientImp getWireClient(UUID conversationId) throws CryptoException, IOException {
         return userMessageResource.getWireClient(conversationId);
     }
 

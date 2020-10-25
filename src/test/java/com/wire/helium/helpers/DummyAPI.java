@@ -1,5 +1,6 @@
-package com.wire.helium;
+package com.wire.helium.helpers;
 
+import com.wire.helium.API;
 import com.wire.xenon.models.otr.*;
 import org.glassfish.jersey.client.JerseyClientBuilder;
 
@@ -7,12 +8,12 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.UUID;
 
-class DummyAPI extends API {
+public class DummyAPI extends API {
     private final Devices devices = new Devices();
     private final HashMap<String, PreKey> lastPreKeys = new HashMap<>(); // <userId-clientId, PreKey>
     private OtrMessage msg;
 
-    DummyAPI() {
+    public DummyAPI() {
         super(JerseyClientBuilder.createClient(), null, null);
     }
 
@@ -53,7 +54,7 @@ class DummyAPI extends API {
         return preKey;
     }
 
-    void addDevice(UUID userId, String client, com.wire.bots.cryptobox.PreKey lastKey) {
+    public void addDevice(UUID userId, String client, com.wire.bots.cryptobox.PreKey lastKey) {
         devices.missing.add(userId, client);
         addLastKey(userId, client, lastKey);
     }
@@ -68,7 +69,7 @@ class DummyAPI extends API {
         return String.format("%s-%s", userId, clientId);
     }
 
-    OtrMessage getMsg() {
+    public OtrMessage getMsg() {
         return msg;
     }
 }

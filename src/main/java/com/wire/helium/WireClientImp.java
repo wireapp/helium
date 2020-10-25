@@ -22,13 +22,14 @@ import com.wire.xenon.WireAPI;
 import com.wire.xenon.WireClientBase;
 import com.wire.xenon.backend.models.NewBot;
 import com.wire.xenon.crypto.Crypto;
+import com.wire.xenon.exceptions.HttpException;
 
 import java.util.UUID;
 
-public class UserClient extends WireClientBase {
+public class WireClientImp extends WireClientBase {
     private final UUID convId;
 
-    public UserClient(WireAPI api, Crypto crypto, NewBot state, UUID convId) {
+    public WireClientImp(WireAPI api, Crypto crypto, NewBot state, UUID convId) {
         super(api, crypto, state);
         this.convId = convId;
     }
@@ -38,4 +39,7 @@ public class UserClient extends WireClientBase {
         return convId;
     }
 
+    public UUID getUserId(String username) throws HttpException {
+        return api.getUserId(username);
+    }
 }

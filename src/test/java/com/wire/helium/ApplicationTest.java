@@ -4,14 +4,18 @@ import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 import com.wire.xenon.MessageHandlerBase;
 import com.wire.xenon.WireClient;
 import com.wire.xenon.assets.MessageText;
+import com.wire.xenon.assets.Picture;
 import com.wire.xenon.backend.models.Conversation;
+import com.wire.xenon.backend.models.User;
 import com.wire.xenon.crypto.CryptoDatabase;
 import com.wire.xenon.crypto.storage.JdbiStorage;
 import com.wire.xenon.factories.CryptoFactory;
 import com.wire.xenon.factories.StorageFactory;
+import com.wire.xenon.models.AssetKey;
 import com.wire.xenon.models.TextMessage;
 import com.wire.xenon.state.JdbiState;
 import com.wire.xenon.tools.Logger;
+import com.wire.xenon.tools.Util;
 import org.flywaydb.core.Flyway;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -22,13 +26,8 @@ import javax.ws.rs.client.ClientBuilder;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.util.Collections;
+import java.util.UUID;
 
-/**
- * Created with IntelliJ IDEA.
- * User: dejankovacevic
- * Date: 24/10/2020
- * Time: 11:16
- */
 public class ApplicationTest {
     private static final String url = "jdbc:postgresql://localhost/lithium";
     private static final DBI dbi = new DBI(url);
@@ -72,10 +71,31 @@ public class ApplicationTest {
 
         app.start();
 
-        UserClient wireClient = app.getWireClient(null);
-        final Conversation conv = wireClient.createConversation("Test", null, Collections.emptyList());
+        // Create WireClient without Conversation in order to create one
+        WireClientImp wireClient = app.getWireClient(null);
+
+        final User self = wireClient.getSelf();
+        final UUID ottoUserId = wireClient.getUserId("ottothebot");
+
+        // Create new conversation with Otto
+        final Conversation conv = wireClient.createConversation("Test", null, Collections.singletonList(ottoUserId));
+
+        // Create new WireClient this time for this newly created conversation
         wireClient = app.getWireClient(conv.id);
+
+        // Add Echo bot into this conv (code: 59d7abe5-3850-4b34-8fe5-0bcd4bfad4e6:aba311a6-fb14-46c9-af1b-3cb454762ef2)
+        wireClient.addService(UUID.fromString("aba311a6-fb14-46c9-af1b-3cb454762ef2"), UUID.fromString("59d7abe5-3850-4b34-8fe5-0bcd4bfad4e6"));
+
+        // Send text
         wireClient.send(new MessageText("Hi there!"));
+
+        // Send Image
+        final byte[] bytes = Util.getResource("moon.jpg");
+        Picture image = new Picture(bytes, "image/jpeg");
+        AssetKey assetKey = wireClient.uploadAsset(image);
+        image.setAssetKey(assetKey.key);
+        image.setAssetToken(assetKey.token);
+        wireClient.send(image);
 
         Thread.sleep(15 * 1000);
         app.stop();

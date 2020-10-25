@@ -49,11 +49,11 @@ public class UserMessageResource extends MessageResourceBase {
         handleUpdate(id, payload, getWireClient(null));
     }
 
-    UserClient getWireClient(UUID convId) throws CryptoException, IOException {
+    WireClientImp getWireClient(UUID convId) throws CryptoException, IOException {
         Crypto crypto = getCrypto();
         NewBot newBot = getState();
         WireAPI api = new API(client, convId, newBot.token);
-        return new UserClient(api, crypto, newBot, convId);
+        return new WireClientImp(api, crypto, newBot, convId);
     }
 
     private NewBot getState() throws IOException {
@@ -89,7 +89,7 @@ public class UserMessageResource extends MessageResourceBase {
         return this;
     }
 
-    protected void handleUpdate(UUID id, Payload payload, UserClient userClient) {
+    protected void handleUpdate(UUID id, Payload payload, WireClientImp userClient) {
         switch (payload.type) {
             case "team.member-join" -> {
                 Logger.debug("%s: team: %s, user: %s", payload.type, payload.team, payload.data.user);

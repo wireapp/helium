@@ -3,6 +3,7 @@ package com.wire.helium;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.waz.model.Messages;
 import com.wire.bots.cryptobox.IStorage;
+import com.wire.helium.helpers.DummyAPI;
 import com.wire.helium.helpers.MemStorage;
 import com.wire.helium.helpers.Util;
 import com.wire.xenon.assets.MessageText;
@@ -56,7 +57,7 @@ public class End2EndTest {
         DummyAPI api = new DummyAPI();
         api.addDevice(aliceId, client1, aliceCrypto1.box().newLastPreKey());
 
-        UserClient aliceClient = new UserClient(api, aliceCrypto, state, null);
+        WireClientImp aliceClient = new WireClientImp(api, aliceCrypto, state, null);
 
         for (int i = 0; i < 10; i++) {
             String text = "Hello Alice, This is Alice!";
@@ -88,7 +89,7 @@ public class End2EndTest {
         NewBot state = new NewBot();
         state.id = aliceId;
         state.client = "alice1";
-        UserClient aliceClient = new UserClient(api, aliceCrypto, state, null);
+        WireClientImp aliceClient = new WireClientImp(api, aliceCrypto, state, null);
 
         for (int i = 0; i < 10; i++) {
             String text = "Hello Bob, This is Alice!";
@@ -129,7 +130,7 @@ public class End2EndTest {
         NewBot state = new NewBot();
         state.id = aliceId;
         state.client = aliceCl;
-        UserClient aliceClient = new UserClient(api, aliceCrypto, state, null);
+        WireClientImp aliceClient = new WireClientImp(api, aliceCrypto, state, null);
 
         for (int i = 0; i < 10; i++) {
             String text = "Hello Bob, This is Alice!";
