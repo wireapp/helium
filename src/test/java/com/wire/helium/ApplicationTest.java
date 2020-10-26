@@ -17,10 +17,12 @@ import com.wire.xenon.models.TextMessage;
 import com.wire.xenon.state.JdbiState;
 import com.wire.xenon.tools.Logger;
 import com.wire.xenon.tools.Util;
+import org.apache.log4j.BasicConfigurator;
 import org.flywaydb.core.Flyway;
+import org.jdbi.v3.core.Jdbi;
+import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.skife.jdbi.v2.DBI;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
@@ -30,11 +32,14 @@ import java.util.Collections;
 import java.util.UUID;
 
 public class ApplicationTest {
-    private static final String url = "jdbc:postgresql://localhost/lithium";
-    private static final DBI dbi = new DBI(url);
+    private static final String url = "jdbc:postgresql://localhost/xenon";
+    private static final Jdbi dbi = Jdbi.create(url)
+            .installPlugin(new SqlObjectPlugin());
 
     @BeforeClass
     public static void before() throws Exception {
+        BasicConfigurator.configure();
+
         Class<?> driverClass = Class.forName("org.postgresql.Driver");
         final Driver driver = (Driver) driverClass.newInstance();
         DriverManager.registerDriver(driver);

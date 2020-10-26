@@ -11,10 +11,11 @@ import com.wire.xenon.backend.models.NewBot;
 import com.wire.xenon.crypto.CryptoDatabase;
 import com.wire.xenon.crypto.storage.JdbiStorage;
 import com.wire.xenon.models.otr.OtrMessage;
+import org.jdbi.v3.core.Jdbi;
+import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.skife.jdbi.v2.DBI;
 
 import java.io.IOException;
 import java.sql.Driver;
@@ -24,8 +25,9 @@ import java.util.Random;
 import java.util.UUID;
 
 public class End2EndTest {
-    private static final String url = "jdbc:postgresql://localhost/lithium";
-    private static final DBI dbi = new DBI(url);
+    private static final String url = "jdbc:postgresql://localhost/xenon";
+    private static final Jdbi dbi = Jdbi.create(url)
+            .installPlugin(new SqlObjectPlugin());
 
     @BeforeClass
     public static void before() throws Exception {
