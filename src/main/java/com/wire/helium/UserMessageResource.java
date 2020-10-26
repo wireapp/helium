@@ -3,8 +3,6 @@ package com.wire.helium;
 import com.wire.bots.cryptobox.CryptoException;
 import com.wire.xenon.MessageHandlerBase;
 import com.wire.xenon.MessageResourceBase;
-import com.wire.xenon.WireAPI;
-import com.wire.xenon.WireClient;
 import com.wire.xenon.backend.models.NewBot;
 import com.wire.xenon.backend.models.Payload;
 import com.wire.xenon.crypto.Crypto;
@@ -26,7 +24,6 @@ public class UserMessageResource extends MessageResourceBase {
     private State state;
 
     public UserMessageResource(MessageHandlerBase handler) {
-
         super(handler);
     }
 
@@ -37,8 +34,7 @@ public class UserMessageResource extends MessageResourceBase {
         }
 
         try {
-            WireClient client = getWireClient(convId);
-
+            var client = getWireClient(convId);
             handleMessage(eventId, payload, client);
         } catch (CryptoException e) {
             Logger.error("onNewMessage: msg: %s, conv: %s, %s", eventId, convId, e);
@@ -50,9 +46,9 @@ public class UserMessageResource extends MessageResourceBase {
     }
 
     WireClientImp getWireClient(UUID convId) throws CryptoException, IOException {
-        Crypto crypto = getCrypto();
-        NewBot newBot = getState();
-        WireAPI api = new API(client, convId, newBot.token);
+        var crypto = getCrypto();
+        var newBot = getState();
+        var api = new API(client, convId, newBot.token);
         return new WireClientImp(api, crypto, newBot, convId);
     }
 
@@ -91,15 +87,17 @@ public class UserMessageResource extends MessageResourceBase {
 
     protected void handleUpdate(UUID id, Payload payload, WireClientImp userClient) {
         switch (payload.type) {
-            case "team.member-join" -> {
+            case "team.member-join":
                 Logger.debug("%s: team: %s, user: %s", payload.type, payload.team, payload.data.user);
                 handler.onNewTeamMember(userClient, payload.data.user);
-            }
-            case "user.update" -> {
+                break;
+            case "user.update":
                 Logger.debug("%s: id: %s", payload.type, payload.user.id);
                 handler.onUserUpdate(id, payload.user.id);
-            }
-            default -> Logger.debug("Unknown event: %s", payload.type);
+                break;
+            default:
+                Logger.debug("Unknown event: %s", payload.type);
+                break;
         }
     }
 }

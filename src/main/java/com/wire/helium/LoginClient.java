@@ -19,19 +19,20 @@
 package com.wire.helium;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.wire.helium.models.Access;
+import com.wire.helium.models.NewClient;
+import com.wire.helium.models.NotificationList;
 import com.wire.xenon.Const;
 import com.wire.xenon.exceptions.AuthException;
 import com.wire.xenon.exceptions.HttpException;
 import com.wire.xenon.models.otr.PreKey;
-import com.wire.helium.models.Access;
-import com.wire.helium.models.NewClient;
-import com.wire.helium.models.NotificationList;
 
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.Invocation;
 import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.*;
+import javax.ws.rs.core.Cookie;
+import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import java.util.*;
 
 public class LoginClient {
@@ -44,22 +45,23 @@ public class LoginClient {
     private final WebTarget notificationsPath;
 
     public LoginClient(Client client) {
+        var host = host();
         loginPath = client
-                .target(host())
+                .target(host)
                 .path("login");
         clientsPath = client
-                .target(host())
+                .target(host)
                 .path("clients");
         accessPath = client
-                .target(host())
+                .target(host)
                 .path("access");
 
         cookiesPath = client
-                .target(host())
+                .target(host)
                 .path("cookies");
 
         notificationsPath = client
-                .target(host())
+                .target(host)
                 .path("notifications");
     }
 
@@ -68,7 +70,7 @@ public class LoginClient {
     }
 
     public String host() {
-        String host = System.getProperty(Const.WIRE_BOTS_SDK_API, System.getenv("WIRE_API_HOST"));
+        var host = System.getProperty(Const.WIRE_BOTS_SDK_API, System.getenv("WIRE_API_HOST"));
         return host != null ? host : "https://prod-nginz-https.wire.com";
     }
 
@@ -77,17 +79,17 @@ public class LoginClient {
     }
 
     public Access login(String email, String password, boolean persisted) throws HttpException {
-        _Login login = new _Login();
+        var login = new _Login();
         login.email = email;
         login.password = password;
         login.label = LABEL;
 
-        Response response = loginPath.
+        var response = loginPath.
                 queryParam("persist", persisted).
                 request(MediaType.APPLICATION_JSON).
                 post(Entity.entity(login, MediaType.APPLICATION_JSON));
 
-        int status = response.getStatus();
+        var status = response.getStatus();
 
         if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
@@ -95,20 +97,20 @@ public class LoginClient {
         }
 
         if (status == 403) {
-            String entity = response.readEntity(String.class);
+            var entity = response.readEntity(String.class);
             throw new AuthException(entity, status);
         }
 
         if (status >= 400) {
-            String entity = response.readEntity(String.class);
+            var entity = response.readEntity(String.class);
             throw new HttpException(entity, status);
         }
 
-        Access access = response.readEntity(Access.class);
+        var access = response.readEntity(Access.class);
 
-        NewCookie zuid = response.getCookies().get(COOKIE_NAME);
+        var zuid = response.getCookies().get(COOKIE_NAME);
         if (zuid != null) {
-            com.wire.helium.models.Cookie c = new com.wire.helium.models.Cookie();
+            var c = new com.wire.helium.models.Cookie();
             c.name = zuid.getName();
             c.value = zuid.getValue();
             access.setCookie(c);
@@ -118,25 +120,21 @@ public class LoginClient {
 
     @Deprecated
     public String registerClient(String token, String password, ArrayList<PreKey> preKeys, PreKey lastKey) throws HttpException {
-        String deviceClass = "tablet";
-        String type = "permanent";
+        var deviceClass = "tablet";
+        var type = "permanent";
         return registerClient(token, password, preKeys, lastKey, deviceClass, type, LABEL);
     }
 
     /**
-     * @param token
      * @param password Wire password
-     * @param preKeys
-     * @param lastKey
      * @param clazz    "tablet" | "phone" | "desktop"
      * @param type     "permanent" | "temporary"
      * @param label    can be anything
      * @return Client id
-     * @throws HttpException
      */
     public String registerClient(String token, String password, ArrayList<PreKey> preKeys, PreKey lastKey,
                                  String clazz, String type, String label) throws HttpException {
-        NewClient newClient = new NewClient();
+        var newClient = new NewClient();
         newClient.password = password;
         newClient.lastkey = lastKey;
         newClient.prekeys = preKeys;
@@ -146,52 +144,47 @@ public class LoginClient {
         newClient.label = label;
         newClient.type = type;
 
-        Response response = clientsPath
+        var response = clientsPath
                 .request(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .post(Entity.entity(newClient, MediaType.APPLICATION_JSON));
 
-        int status = response.getStatus();
+        var status = response.getStatus();
 
         if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
             throw new AuthException(status);
-        }
-
-        if (status >= 400)
+        } else if (status >= 400) {
             throw response.readEntity(HttpException.class);
+        }
 
         return response.readEntity(_Client.class).id;
     }
 
     public Access renewAccessToken(Cookie cookie) throws HttpException {
-        Invocation.Builder builder = accessPath
+        var builder = accessPath
                 .request(MediaType.APPLICATION_JSON)
                 .cookie(cookie);
 
-        Response response = builder.
+        var response = builder.
                 post(Entity.entity(null, MediaType.APPLICATION_JSON));
 
-        int status = response.getStatus();
+        var status = response.getStatus();
 
         if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
             throw new AuthException(status);
-        }
-
-        if (status == 403) {
+        } else if (status == 403) {
             throw response.readEntity(AuthException.class);
-        }
-
-        if (status >= 400) {
+        } else if (status >= 400) {
             throw response.readEntity(HttpException.class);
         }
 
-        Access access = response.readEntity(Access.class);
+        var access = response.readEntity(Access.class);
 
-        NewCookie zuid = response.getCookies().get(COOKIE_NAME);
+        var zuid = response.getCookies().get(COOKIE_NAME);
         if (zuid != null) {
-            com.wire.helium.models.Cookie c = new com.wire.helium.models.Cookie();
+            var c = new com.wire.helium.models.Cookie();
             c.name = zuid.getName();
             c.value = zuid.getValue();
             access.setCookie(c);
@@ -200,51 +193,47 @@ public class LoginClient {
     }
 
     public void logout(Cookie cookie, String token) throws HttpException {
-        Response response = accessPath
+        var response = accessPath
                 .path("logout")
                 .request(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .cookie(cookie)
                 .post(Entity.entity(null, MediaType.APPLICATION_JSON));
 
-        int status = response.getStatus();
+        var status = response.getStatus();
         if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
             throw new AuthException(status);
-        }
-
-        if (status == 403) {
+        } else if (status == 403) {
             throw response.readEntity(AuthException.class);
-        }
-
-        if (status >= 400) {
+        } else if (status >= 400) {
             throw response.readEntity(HttpException.class);
         }
     }
 
     public void removeCookies(String token, String password) throws HttpException {
-        _RemoveCookies removeCookies = new _RemoveCookies();
+        var removeCookies = new _RemoveCookies();
         removeCookies.password = password;
         removeCookies.labels = Collections.singletonList(LABEL);
 
-        Response response = cookiesPath.
+        var response = cookiesPath.
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 post(Entity.entity(removeCookies, MediaType.APPLICATION_JSON));
 
-        int status = response.getStatus();
+        var status = response.getStatus();
 
         if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
             throw new AuthException(status);
+        } else if (status >= 400) {
+            throw response.readEntity(HttpException.class);
         }
 
-        if (status >= 400)
-            throw response.readEntity(HttpException.class);
     }
 
     public NotificationList retrieveNotifications(String client, UUID since, String token, int size) throws HttpException {
-        WebTarget webTarget = notificationsPath
+        var webTarget = notificationsPath
                 .queryParam("client", client)
                 .queryParam("size", size);
 
@@ -253,28 +242,22 @@ public class LoginClient {
                     .queryParam("since", since.toString());
         }
 
-        Response response = webTarget
+        var response = webTarget
                 .request(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .get();
 
-        int status = response.getStatus();
+        var status = response.getStatus();
 
         if (status == 200) {
             return response.readEntity(NotificationList.class);
-        }
-
-        if (status == 404) {  //todo what???
+        } else if (status == 404) {  //todo what???
             return response.readEntity(NotificationList.class);
-        }
-
-        if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
+        } else if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
             throw new AuthException(status);
-        }
-
-        if (status == 403) {
+        } else if (status == 403) {
             throw response.readEntity(AuthException.class);
         }
 
