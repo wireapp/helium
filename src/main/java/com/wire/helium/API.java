@@ -42,6 +42,8 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+import javax.ws.rs.client.Invocation;
+import javax.ws.rs.core.Response;
 
 public class API extends LoginClient implements WireAPI {
     private final WebTarget conversationsPath;
@@ -60,7 +62,7 @@ public class API extends LoginClient implements WireAPI {
         this.convId = convId != null ? convId.toString() : null;
         this.token = token;
 
-        var target = client
+        WebTarget target = client
                 .target(host());
 
         conversationsPath = target.path("conversations");
@@ -73,7 +75,7 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public Devices sendMessage(OtrMessage msg, Object... ignoreMissing) throws HttpException {
-        var response = conversationsPath.
+        Response response = conversationsPath.
                 path(convId).
                 path("otr/messages").
                 queryParam("ignore_missing", ignoreMissing).
@@ -81,7 +83,7 @@ public class API extends LoginClient implements WireAPI {
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 post(Entity.entity(msg, MediaType.APPLICATION_JSON));
 
-        var statusCode = response.getStatus();
+        int statusCode = response.getStatus();
         if (statusCode == 412) {
             return response.readEntity(Devices.class);
         } else if (statusCode >= 400) {
@@ -94,7 +96,7 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public Devices sendPartialMessage(OtrMessage msg, UUID userId) throws HttpException {
-        var response = conversationsPath.
+        Response response = conversationsPath.
                 path(convId).
                 path("otr/messages").
                 queryParam("report_missing", userId).
@@ -102,7 +104,7 @@ public class API extends LoginClient implements WireAPI {
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 post(Entity.entity(msg, MediaType.APPLICATION_JSON));
 
-        var statusCode = response.getStatus();
+        int statusCode = response.getStatus();
         if (statusCode == 412) {
             return response.readEntity(Devices.class);
         } else if (statusCode >= 400) {
@@ -127,7 +129,7 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public byte[] downloadAsset(String assetKey, String assetToken) throws HttpException {
-        var req = assetsPath
+        Invocation.Builder req = assetsPath
                 .path(assetKey)
                 .queryParam("access_token", token)
                 .request();
@@ -135,7 +137,7 @@ public class API extends LoginClient implements WireAPI {
         if (assetToken != null)
             req.header("Asset-Token", assetToken);
 
-        var response = req.get();
+        Response response = req.get();
 
         if (response.getStatus() >= 400) {
             String log = String.format("%s. AssetId: %s", response.readEntity(String.class), assetKey);
@@ -147,10 +149,10 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public void acceptConnection(UUID user) throws HttpException {
-        var connection = new Connection();
+        Connection connection = new Connection();
         connection.setStatus("accepted");
 
-        var response = connectionsPath.
+        Response response = connectionsPath.
                 path(user.toString()).
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
@@ -164,7 +166,7 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public AssetKey uploadAsset(IAsset asset) throws Exception {
-        var sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
 
         // Part 1
         String strMetadata = String.format("{\"public\": %s, \"retention\": \"%s\"}",
@@ -191,12 +193,12 @@ public class API extends LoginClient implements WireAPI {
                 .append("\r\n\r\n");
 
         // Complete
-        var os = new ByteArrayOutputStream();
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
         os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
         os.write(asset.getEncryptedData());
         os.write("\r\n--frontier--\r\n".getBytes(StandardCharsets.UTF_8));
 
-        var response = assetsPath
+        Response response = assetsPath
                 .request(MediaType.APPLICATION_JSON_TYPE)
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .post(Entity.entity(os.toByteArray(), "multipart/mixed; boundary=frontier"));
@@ -206,13 +208,13 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public Conversation getConversation() {
-        var conv = conversationsPath.
+        _Conv conv = conversationsPath.
                 path(convId).
                 request().
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 get(_Conv.class);
 
-        var ret = new Conversation();
+        Conversation ret = new Conversation();
         ret.name = conv.name;
         ret.id = conv.id;
         ret.members = conv.members.others;
@@ -221,7 +223,7 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public boolean deleteConversation(UUID teamId) throws HttpException {
-        var response = teamsPath.
+        Response response = teamsPath.
                 path(teamId.toString()).
                 path("conversations").
                 path(convId).
@@ -238,11 +240,11 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public User addService(UUID serviceId, UUID providerId) throws HttpException {
-        var service = new _Service();
+        _Service service = new _Service();
         service.service = serviceId;
         service.provider = providerId;
 
-        var response = conversationsPath.
+        Response response = conversationsPath.
                 path(convId).
                 path("bots").
                 request().
@@ -255,7 +257,7 @@ public class API extends LoginClient implements WireAPI {
             throw new HttpException(msg, response.getStatus());
         }
 
-        var user = response.readEntity(User.class);
+        User user = response.readEntity(User.class);
         user.service = new Service();
         user.service.id = serviceId;
         user.service.providerId = providerId;
@@ -264,10 +266,10 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public User addParticipants(UUID... userIds) throws HttpException {
-        var newConv = new _NewConv();
+        _NewConv newConv = new _NewConv();
         newConv.users = Arrays.asList(userIds);
 
-        var response = conversationsPath.
+        Response response = conversationsPath.
                 path(convId).
                 path("members").
                 request().
@@ -275,7 +277,7 @@ public class API extends LoginClient implements WireAPI {
                 post(Entity.entity(newConv, MediaType.APPLICATION_JSON));
 
         if (response.getStatus() >= 400) {
-            var msg = response.readEntity(String.class);
+            String msg = response.readEntity(String.class);
             throw new HttpException(msg, response.getStatus());
         }
 
@@ -284,7 +286,7 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public Conversation createConversation(String name, UUID teamId, List<UUID> users) throws HttpException {
-        var newConv = new _NewConv();
+        _NewConv newConv = new _NewConv();
         newConv.name = name;
         newConv.users = users;
         if (teamId != null) {
@@ -292,7 +294,7 @@ public class API extends LoginClient implements WireAPI {
             newConv.team.teamId = teamId;
         }
 
-        var response = conversationsPath.
+        Response response = conversationsPath.
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 post(Entity.entity(newConv, MediaType.APPLICATION_JSON));
@@ -301,9 +303,9 @@ public class API extends LoginClient implements WireAPI {
             throw new HttpException(response.readEntity(String.class), response.getStatus());
         }
 
-        var conv = response.readEntity(_Conv.class);
+        _Conv conv = response.readEntity(_Conv.class);
 
-        var ret = new Conversation();
+        Conversation ret = new Conversation();
         ret.name = conv.name;
         ret.id = conv.id;
         ret.members = conv.members.others;
@@ -313,7 +315,7 @@ public class API extends LoginClient implements WireAPI {
     @Override
     public Conversation createOne2One(UUID teamId, UUID userId) throws HttpException {
 
-        var newConv = new _NewConv();
+        _NewConv newConv = new _NewConv();
         newConv.users = Collections.singletonList(userId);
 
         if (teamId != null) {
@@ -321,7 +323,7 @@ public class API extends LoginClient implements WireAPI {
             newConv.team.teamId = teamId;
         }
 
-        var response = conversationsPath
+        Response response = conversationsPath
                 .path("one2one")
                 .request(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
@@ -331,9 +333,9 @@ public class API extends LoginClient implements WireAPI {
             throw new HttpException(response.readEntity(String.class), response.getStatus());
         }
 
-        var conv = response.readEntity(_Conv.class);
+        _Conv conv = response.readEntity(_Conv.class);
 
-        var ret = new Conversation();
+        Conversation ret = new Conversation();
         ret.name = conv.name;
         ret.id = conv.id;
         ret.members = conv.members.others;
@@ -342,7 +344,7 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public void leaveConversation(UUID user) throws HttpException {
-        var response = conversationsPath
+        Response response = conversationsPath
                 .path(convId)
                 .path("members")
                 .path(user.toString())
@@ -372,7 +374,7 @@ public class API extends LoginClient implements WireAPI {
                 request().
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 accept(MediaType.APPLICATION_JSON).
-                get(new GenericType<>() {
+                get(new GenericType<ArrayList<Integer>>() {
                 });
     }
 
@@ -382,12 +384,12 @@ public class API extends LoginClient implements WireAPI {
                 queryParam("ids", ids.toArray()).
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
-                get(new GenericType<>() {
+                get(new GenericType<Collection<User>>() {
                 });
     }
 
     public User getUser(UUID userId) throws HttpException {
-        var response = usersPath.
+        Response response = usersPath.
                 path(userId.toString()).
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
@@ -401,7 +403,7 @@ public class API extends LoginClient implements WireAPI {
     }
 
     public UUID getUserId(String handle) throws HttpException {
-        var response = usersPath.
+        Response response = usersPath.
                 path("handles").
                 path(handle).
                 request(MediaType.APPLICATION_JSON).
@@ -412,12 +414,12 @@ public class API extends LoginClient implements WireAPI {
             throw new HttpException(response.readEntity(String.class), response.getStatus());
         }
 
-        var teamMember = response.readEntity(_TeamMember.class);
+        _TeamMember teamMember = response.readEntity(_TeamMember.class);
         return teamMember.user;
     }
 
     public boolean hasDevice(UUID userId, String clientId) {
-        var response = usersPath.
+        Response response = usersPath.
                 path(userId.toString()).
                 path("clients").
                 path(clientId).
@@ -438,7 +440,7 @@ public class API extends LoginClient implements WireAPI {
     }
 
     public UUID getTeam() throws HttpException {
-        var response = teamsPath
+        Response response = teamsPath
                 .request(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .accept(MediaType.APPLICATION_JSON)
@@ -448,7 +450,7 @@ public class API extends LoginClient implements WireAPI {
             throw new HttpException(response.readEntity(String.class), response.getStatus());
         }
 
-        var teams = response.readEntity(_Teams.class);
+        _Teams teams = response.readEntity(_Teams.class);
         if (teams.teams.isEmpty())
             return null;
 
@@ -456,7 +458,7 @@ public class API extends LoginClient implements WireAPI {
     }
 
     public Collection<UUID> getTeamMembers(UUID teamId) {
-        var team = teamsPath
+        _Team team = teamsPath
                 .path(teamId.toString())
                 .path("members")
                 .request(MediaType.APPLICATION_JSON)

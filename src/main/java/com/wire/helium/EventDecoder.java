@@ -27,7 +27,7 @@ public class EventDecoder implements Decoder.BinaryStream<Event> {
     @Override
     public Event decode(InputStream is) {
         try {
-            var str = new String(Util.toByteArray(is), StandardCharsets.UTF_8);
+            String str = new String(Util.toByteArray(is), StandardCharsets.UTF_8);
             if (str.equalsIgnoreCase("pong")) {
                 Logger.debug("MessageDecoder: %s", str);
             } else {

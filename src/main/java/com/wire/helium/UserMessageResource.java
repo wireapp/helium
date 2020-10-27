@@ -3,6 +3,7 @@ package com.wire.helium;
 import com.wire.bots.cryptobox.CryptoException;
 import com.wire.xenon.MessageHandlerBase;
 import com.wire.xenon.MessageResourceBase;
+import com.wire.xenon.WireClient;
 import com.wire.xenon.backend.models.NewBot;
 import com.wire.xenon.backend.models.Payload;
 import com.wire.xenon.crypto.Crypto;
@@ -34,7 +35,7 @@ public class UserMessageResource extends MessageResourceBase {
         }
 
         try {
-            var client = getWireClient(convId);
+            WireClient client = getWireClient(convId);
             handleMessage(eventId, payload, client);
         } catch (CryptoException e) {
             Logger.error("onNewMessage: msg: %s, conv: %s, %s", eventId, convId, e);
@@ -46,9 +47,9 @@ public class UserMessageResource extends MessageResourceBase {
     }
 
     WireClientImp getWireClient(UUID convId) throws CryptoException, IOException {
-        var crypto = getCrypto();
-        var newBot = getState();
-        var api = new API(client, convId, newBot.token);
+        Crypto crypto = getCrypto();
+        NewBot newBot = getState();
+        API api = new API(client, convId, newBot.token);
         return new WireClientImp(api, crypto, newBot, convId);
     }
 
