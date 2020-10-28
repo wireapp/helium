@@ -1,13 +1,18 @@
 package com.wire.helium;
 
 import com.wire.bots.cryptobox.CryptoException;
+import com.wire.helium.models.Access;
 import com.wire.helium.models.Event;
+import com.wire.helium.models.NotificationList;
 import com.wire.xenon.MessageHandlerBase;
 import com.wire.xenon.backend.models.NewBot;
 import com.wire.xenon.backend.models.Payload;
+import com.wire.xenon.crypto.Crypto;
 import com.wire.xenon.exceptions.HttpException;
 import com.wire.xenon.factories.CryptoFactory;
 import com.wire.xenon.factories.StorageFactory;
+import com.wire.xenon.models.otr.PreKey;
+import com.wire.xenon.state.State;
 import com.wire.xenon.tools.Logger;
 import org.glassfish.tyrus.client.ClientManager;
 import org.glassfish.tyrus.client.ClientProperties;
@@ -16,8 +21,10 @@ import javax.websocket.*;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.core.Cookie;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -73,30 +80,30 @@ public class Application {
 
     public void stop() throws Exception {
         Logger.info("Logging out...");
-        var state = storageFactory.create(userId).getState();
+        NewBot state = storageFactory.create(userId).getState();
         loginClient.logout(cookie, state.token);
     }
 
     public void start() throws Exception {
         loginClient = new LoginClient(client);
-        var access = loginClient.login(email, password);
+        Access access = loginClient.login(email, password);
 
         userId = access.getUser();
         cookie = new Cookie(access.getCookie().name, access.getCookie().value);
 
-        var clientId = getClientId();
+        String clientId = getClientId();
         if (clientId == null) {
             clientId = newDevice(userId, password, access.getAccess_token());
             Logger.info("Created new device. clientId: %s", clientId);
         }
-        var state = updateState(userId, clientId, access.getAccess_token(), null);
+        NewBot state = updateState(userId, clientId, access.getAccess_token(), null);
 
         Logger.info("Logged in as: %s, userId: %s, clientId: %s", email, state.id, state.client);
 
-        var deviceId = state.client;
+        String deviceId = state.client;
         renewal.scheduleAtFixedRate(() -> {
             try {
-                var newAccess = loginClient.renewAccessToken(cookie);
+                Access newAccess = loginClient.renewAccessToken(cookie);
                 updateState(userId, deviceId, newAccess.getAccess_token(), null);
                 Logger.info("Updated access token. Exp in: %d sec, cookie: %s",
                         newAccess.expires_in,
@@ -124,7 +131,7 @@ public class Application {
 
         // Pull from notification stream
         if (sync) {
-            var notificationList = loginClient.retrieveNotifications(state.client,
+            NotificationList notificationList = loginClient.retrieveNotifications(state.client,
                     since(state),
                     state.token,
                     SIZE);
@@ -196,11 +203,11 @@ public class Application {
     }
 
     private Session connectSocket() throws IOException, DeploymentException {
-        var newBot = storageFactory
+        NewBot newBot = storageFactory
                 .create(userId)
                 .getState();
 
-        var wss = client
+        URI wss = client
                 .target(wsUrl)
                 .path("await")
                 .queryParam("client", newBot.client)
@@ -208,7 +215,7 @@ public class Application {
                 .getUri();
 
         // connect the Websocket
-        var container = ClientManager.createClient();
+        ClientManager container = ClientManager.createClient();
         container.getProperties().put(ClientProperties.RECONNECT_HANDLER, new SocketReconnectHandler(5));
         container.setDefaultMaxSessionIdleTimeout(-1);
 
@@ -216,11 +223,11 @@ public class Application {
     }
 
     public String newDevice(UUID userId, String password, String token) throws CryptoException, HttpException {
-        var crypto = cryptoFactory.create(userId);
-        var loginClient = new LoginClient(client);
+        Crypto crypto = cryptoFactory.create(userId);
+        LoginClient loginClient = new LoginClient(client);
 
-        var preKeys = crypto.newPreKeys(0, 20);
-        var lastKey = crypto.newLastPreKey();
+        ArrayList<PreKey> preKeys = crypto.newPreKeys(0, 20);
+        PreKey lastKey = crypto.newLastPreKey();
 
         return loginClient.registerClient(token, password, preKeys, lastKey, "tablet", "permanent", "lithium");
     }
@@ -242,7 +249,7 @@ public class Application {
     }
 
     public NewBot updateState(UUID userId, String clientId, String token, UUID last) throws IOException {
-        var state = storageFactory.create(userId);
+        State state = storageFactory.create(userId);
 
         NewBot newBot;
         try {
