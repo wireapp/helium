@@ -36,8 +36,8 @@ public class Application {
     private final ScheduledExecutorService renewal;
     private final String email;
     private final String password;
-    private final boolean sync;
-    private final String wsUrl;
+    private boolean sync;
+    private String wsUrl;
 
     private StorageFactory storageFactory;
     private CryptoFactory cryptoFactory;
@@ -56,6 +56,25 @@ public class Application {
         this.wsUrl = wsUrl;
 
         renewal = Executors.newScheduledThreadPool(1);
+    }
+
+    public Application(String email, String password) {
+        this.email = email;
+        this.password = password;
+        this.sync = true;
+        this.wsUrl = "wss://prod-nginz-ssl.wire.com";
+
+        renewal = Executors.newScheduledThreadPool(1);
+    }
+
+    public Application addWSUrl(String wsUrl) {
+        this.wsUrl = wsUrl;
+        return this;
+    }
+
+    public Application shouldSync(boolean sync) {
+        this.sync = sync;
+        return this;
     }
 
     public Application addHandler(MessageHandlerBase handler) {
@@ -86,17 +105,17 @@ public class Application {
 
     public void start() throws Exception {
         loginClient = new LoginClient(client);
-        Access access = loginClient.login(email, password);
+        Access access = loginClient.login(email, password, true);
 
-        userId = access.getUser();
-        cookie = new Cookie(access.getCookie().name, access.getCookie().value);
+        userId = access.getUserId();
+        cookie = convert(access.getCookie());
 
         String clientId = getClientId();
         if (clientId == null) {
-            clientId = newDevice(userId, password, access.getAccess_token());
+            clientId = newDevice(userId, password, access.getAccessToken());
             Logger.info("Created new device. clientId: %s", clientId);
         }
-        NewBot state = updateState(userId, clientId, access.getAccess_token(), null);
+        NewBot state = updateState(userId, clientId, access.getAccessToken(), null);
 
         Logger.info("Logged in as: %s, userId: %s, clientId: %s", email, state.id, state.client);
 
@@ -104,14 +123,20 @@ public class Application {
         renewal.scheduleAtFixedRate(() -> {
             try {
                 Access newAccess = loginClient.renewAccessToken(cookie);
-                updateState(userId, deviceId, newAccess.getAccess_token(), null);
+                updateState(userId, deviceId, newAccess.getAccessToken(), null);
+
+                if (newAccess.hasCookie()) {
+                    cookie = convert(newAccess.getCookie());
+                }
+
                 Logger.info("Updated access token. Exp in: %d sec, cookie: %s",
-                        newAccess.expires_in,
-                        newAccess.getCookie() != null);
+                        newAccess.expiresIn,
+                        newAccess.hasCookie());
+
             } catch (Exception e) {
                 Logger.warning("Token renewal error: %s", e);
             }
-        }, 900, 900, TimeUnit.SECONDS);
+        }, access.expiresIn, access.expiresIn, TimeUnit.SECONDS);
 
         renewal.scheduleAtFixedRate(() -> {
             try {
@@ -145,8 +170,14 @@ public class Application {
             }
         }
 
-        session = connectSocket();
-        Logger.info("Websocket %s uri: %s", session.isOpen(), session.getRequestURI());
+        if (wsUrl != null) {
+            session = connectSocket(wsUrl);
+            Logger.info("Websocket %s uri: %s", session.isOpen(), session.getRequestURI());
+        }
+    }
+
+    private Cookie convert(com.wire.helium.models.Cookie cookie) {
+        return new Cookie(cookie.name, cookie.value);
     }
 
     private UUID since(NewBot state) {
@@ -199,10 +230,10 @@ public class Application {
     @OnClose
     public void onClose(Session closed, CloseReason reason) throws IOException, DeploymentException {
         Logger.debug("Session closed: %s, %s", closed.getId(), reason);
-        session = connectSocket();
+        session = connectSocket(wsUrl);
     }
 
-    private Session connectSocket() throws IOException, DeploymentException {
+    private Session connectSocket(String wsUrl) throws IOException, DeploymentException {
         NewBot newBot = storageFactory
                 .create(userId)
                 .getState();

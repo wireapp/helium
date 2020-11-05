@@ -12,23 +12,23 @@ public class Access {
     private Cookie cookie;
 
     @JsonProperty("user")
-    public UUID user;
+    public UUID userId;
 
     @JsonProperty("access_token")
-    public String access_token;
+    public String accessToken;
 
     @JsonProperty("expires_in")
-    public int expires_in;
+    public int expiresIn;
 
     @JsonProperty("token_type")
-    public String token_type;
+    public String tokenType;
 
-    public UUID getUser() {
-        return user;
+    public UUID getUserId() {
+        return userId;
     }
 
-    public String getAccess_token() {
-        return access_token;
+    public String getAccessToken() {
+        return accessToken;
     }
 
     public Cookie getCookie() {
@@ -38,5 +38,10 @@ public class Access {
     @JsonIgnore
     public void setCookie(Cookie cookie) {
         this.cookie = cookie;
+    }
+
+    @JsonIgnore
+    public boolean hasCookie() {
+        return cookie != null;
     }
 }
