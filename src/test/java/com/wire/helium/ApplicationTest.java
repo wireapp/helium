@@ -54,8 +54,8 @@ public class ApplicationTest {
 
     @Test
     public void sendMessagesTest() throws Exception {
-        String email = "dejan@wire.com";
-        String password = "12345678";
+        String email = "your email";
+        String password = "secret";
         String wsUrl = "wss://prod-nginz-ssl.wire.com";
 
         Client client = ClientBuilder

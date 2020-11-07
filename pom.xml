@@ -48,7 +48,7 @@
         <dependency>
             <groupId>org.glassfish.jersey.core</groupId>
             <artifactId>jersey-client</artifactId>
-            <version>2.25.1</version>
+            <version>2.32</version>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
@@ -65,6 +65,7 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <version>42.2.18</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
