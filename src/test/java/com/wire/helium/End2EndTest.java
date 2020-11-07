@@ -25,7 +25,7 @@ import java.util.Random;
 import java.util.UUID;
 
 public class End2EndTest {
-    private static final String url = "jdbc:postgresql://localhost/xenon";
+    private static final String url = "jdbc:postgresql://localhost/helium";
     private static final Jdbi dbi = Jdbi.create(url)
             .installPlugin(new SqlObjectPlugin());
 

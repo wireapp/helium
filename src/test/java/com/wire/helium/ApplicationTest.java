@@ -32,7 +32,7 @@ import java.util.Collections;
 import java.util.UUID;
 
 public class ApplicationTest {
-    private static final String url = "jdbc:postgresql://localhost/xenon";
+    private static final String url = "jdbc:postgresql://localhost/helium";
     private static final Jdbi dbi = Jdbi.create(url)
             .installPlugin(new SqlObjectPlugin());
 
