@@ -21,7 +21,7 @@ public class SocketReconnectHandler extends ClientManager.ReconnectHandler {
 
     @Override
     public boolean onConnectFailure(Exception e) {
-        Logger.warning("Websocket onConnectFailure: reason: %s", e);
+        Logger.exception("Websocket onConnectFailure: reason: %s", e, e.getMessage());
         return true;
     }
 

@@ -34,7 +34,7 @@ public class EventDecoder implements Decoder.BinaryStream<Event> {
                 return mapper.readValue(str, Event.class);
             }
         } catch (IOException e) {
-            Logger.error("MessageDecoder: %s", e);
+            Logger.exception("MessageDecoder: %s", e, e.getMessage());
         }
         return null;
     }
