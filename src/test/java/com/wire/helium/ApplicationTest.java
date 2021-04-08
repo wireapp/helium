@@ -74,7 +74,7 @@ public class ApplicationTest {
                 try {
                     final byte[] bytes = client.downloadAsset(msg.getAssetKey(), msg.getAssetToken(), msg.getSha256(), msg.getOtrKey());
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    Logger.exception("It was not possible to download an image.", e);
                 }
             }
         };

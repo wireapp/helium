@@ -216,8 +216,7 @@ public class Application {
                         Logger.info("Unknown type: %s, from: %s", payload.type, payload.from);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-                Logger.error("Endpoint:onMessage: %s %s", payload.type, e);
+                Logger.exception("Endpoint:onMessage: %s %s", e, e.getMessage(), payload.type);
             }
         }
     }
