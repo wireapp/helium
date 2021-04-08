@@ -134,7 +134,7 @@ public class Application {
                         newAccess.hasCookie());
 
             } catch (Exception e) {
-                Logger.warning("Token renewal error: %s", e);
+                Logger.exception("Token renewal error: %s", e, e.getMessage());
             }
         }, access.expiresIn, access.expiresIn, TimeUnit.SECONDS);
 
@@ -144,7 +144,7 @@ public class Application {
                     session.getBasicRemote().sendBinary(ByteBuffer.wrap("ping".getBytes(StandardCharsets.UTF_8)));
                 }
             } catch (Exception e) {
-                Logger.warning("Ping error: %s", e);
+                Logger.exception("Ping error: %s", e, e.getMessage());
             }
         }, 10, 10, TimeUnit.SECONDS);
 
@@ -216,8 +216,7 @@ public class Application {
                         Logger.info("Unknown type: %s, from: %s", payload.type, payload.from);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-                Logger.error("Endpoint:onMessage: %s %s", payload.type, e);
+                Logger.exception("Endpoint:onMessage: %s %s", e, e.getMessage(), payload.type);
             }
         }
     }

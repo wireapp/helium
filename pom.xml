@@ -6,7 +6,7 @@
 
     <groupId>com.wire</groupId>
     <artifactId>helium</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.1</version>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -34,7 +34,7 @@
         <dependency>
             <groupId>com.wire</groupId>
             <artifactId>xenon</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.0.1</version>
         </dependency>
         <dependency>
             <groupId>jakarta.ws.rs</groupId>
@@ -112,7 +112,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.8.1</version>
-                
+
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

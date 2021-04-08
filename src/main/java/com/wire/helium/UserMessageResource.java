@@ -38,7 +38,7 @@ public class UserMessageResource extends MessageResourceBase {
             WireClient client = getWireClient(convId);
             handleMessage(eventId, payload, client);
         } catch (CryptoException e) {
-            Logger.error("onNewMessage: msg: %s, conv: %s, %s", eventId, convId, e);
+            Logger.exception("onNewMessage: msg: %s, conv: %s, %s", e, eventId, convId, e.getMessage());
         }
     }
 
