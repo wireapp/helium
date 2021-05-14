@@ -11,50 +11,43 @@ import com.wire.xenon.backend.models.NewBot;
 import com.wire.xenon.crypto.CryptoDatabase;
 import com.wire.xenon.crypto.storage.JdbiStorage;
 import com.wire.xenon.models.otr.OtrMessage;
-import org.jdbi.v3.core.Jdbi;
-import org.jdbi.v3.sqlobject.SqlObjectPlugin;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.sql.Driver;
-import java.sql.DriverManager;
 import java.util.Base64;
-import java.util.Random;
 import java.util.UUID;
 
-public class End2EndTest {
-    private static final String url = "jdbc:postgresql://localhost/helium";
-    private static final Jdbi dbi = Jdbi.create(url)
-            .installPlugin(new SqlObjectPlugin());
+public class End2EndTest extends DatabaseTestBase {
 
-    @BeforeClass
-    public static void before() throws Exception {
-        Class<?> driverClass = Class.forName("org.postgresql.Driver");
-        final Driver driver = (Driver) driverClass.newInstance();
-        DriverManager.registerDriver(driver);
+    private IStorage storage;
+    private String rootFolder;
+
+    @BeforeEach
+    public void beforeEach() {
+        rootFolder = "helium-unit-test-" + UUID.randomUUID();
+        storage = new JdbiStorage(jdbi);
+        flyway.migrate();
     }
 
-    @AfterClass
-    public static void clean() throws IOException {
-        Util.deleteDir("data");
+    @AfterEach
+    public void afterEach() throws IOException {
+        flyway.clean();
+        Util.deleteDir(rootFolder);
     }
 
     @Test
     public void testAliceToAlice() throws Exception {
-        Random rnd = new Random();
         UUID aliceId = UUID.randomUUID();
-        String client1 = "alice1_" + Math.abs(rnd.nextInt());
+        String client1 = "alice1_" + UUID.randomUUID();
 
         NewBot state = new NewBot();
         state.id = aliceId;
         state.client = aliceId.toString();
 
-        IStorage storage = new JdbiStorage(dbi);
-
-        CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, "data/testAliceToAlice/1");
-        CryptoDatabase aliceCrypto1 = new CryptoDatabase(aliceId, storage, "data/testAliceToAlice/2");
+        CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, rootFolder + "/testAliceToAlice/1");
+        CryptoDatabase aliceCrypto1 = new CryptoDatabase(aliceId, storage, rootFolder + "/testAliceToAlice/2");
 
         DummyAPI api = new DummyAPI();
         api.addDevice(aliceId, client1, aliceCrypto1.box().newLastPreKey());
@@ -82,8 +75,8 @@ public class End2EndTest {
 
         MemStorage storage = new MemStorage();
 
-        CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, "data/testAliceToBob");
-        CryptoDatabase bobCrypto = new CryptoDatabase(bobId, storage, "data/testAliceToBob");
+        CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, rootFolder + "/testAliceToBob");
+        CryptoDatabase bobCrypto = new CryptoDatabase(bobId, storage, rootFolder + "/testAliceToBob");
 
         DummyAPI api = new DummyAPI();
         api.addDevice(bobId, client1, bobCrypto.box().newLastPreKey());
@@ -108,26 +101,23 @@ public class End2EndTest {
 
     @Test
     public void testMultiDevicePostgres() throws Exception {
-        Random rnd = new Random();
         UUID bobId = UUID.randomUUID();
         UUID aliceId = UUID.randomUUID();
-        String client1 = "bob1_" + rnd.nextInt();
-        String client2 = "bob2_" + rnd.nextInt();
-        String client3 = "alice3_" + rnd.nextInt();
-        String aliceCl = "alice_" + rnd.nextInt();
+        String client1 = "bob1_" + UUID.randomUUID();
+        String client2 = "bob2_" + UUID.randomUUID();
+        String client3 = "alice3_" + UUID.randomUUID();
+        String aliceCl = "alice_" + UUID.randomUUID();
 
-        IStorage storage = new JdbiStorage(dbi);
-
-        CryptoDatabase aliceCrypto1 = new CryptoDatabase(aliceId, storage, "data/testMultiDevicePostgres/alice/1");
-        CryptoDatabase bobCrypto1 = new CryptoDatabase(bobId, storage, "data/testMultiDevicePostgres/bob/1");
-        CryptoDatabase bobCrypto2 = new CryptoDatabase(bobId, storage, "data/testMultiDevicePostgres/bob/2");
+        CryptoDatabase aliceCrypto1 = new CryptoDatabase(aliceId, storage, rootFolder + "/testMultiDevicePostgres/alice/1");
+        CryptoDatabase bobCrypto1 = new CryptoDatabase(bobId, storage, rootFolder + "/testMultiDevicePostgres/bob/1");
+        CryptoDatabase bobCrypto2 = new CryptoDatabase(bobId, storage, rootFolder + "/testMultiDevicePostgres/bob/2");
 
         DummyAPI api = new DummyAPI();
         api.addDevice(bobId, client1, bobCrypto1.box().newLastPreKey());
         api.addDevice(bobId, client2, bobCrypto2.box().newLastPreKey());
         api.addDevice(aliceId, client3, aliceCrypto1.box().newLastPreKey());
 
-        CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, "data/testMultiDevicePostgres/alice");
+        CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, rootFolder + "/testMultiDevicePostgres/alice");
 
         NewBot state = new NewBot();
         state.id = aliceId;

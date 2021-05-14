@@ -14,12 +14,12 @@ import com.wire.xenon.factories.StorageFactory;
 import com.wire.xenon.models.otr.PreKey;
 import com.wire.xenon.state.State;
 import com.wire.xenon.tools.Logger;
+import jakarta.websocket.*;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.core.Cookie;
 import org.glassfish.tyrus.client.ClientManager;
 import org.glassfish.tyrus.client.ClientProperties;
 
-import javax.websocket.*;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.core.Cookie;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;

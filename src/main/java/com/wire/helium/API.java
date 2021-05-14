@@ -31,19 +31,19 @@ import com.wire.xenon.exceptions.HttpException;
 import com.wire.xenon.models.AssetKey;
 import com.wire.xenon.models.otr.*;
 import com.wire.xenon.tools.Util;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.Entity;
+import jakarta.ws.rs.client.Invocation;
+import jakarta.ws.rs.client.WebTarget;
+import jakarta.ws.rs.core.GenericType;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
-import javax.ws.rs.client.Invocation;
-import javax.ws.rs.core.Response;
 
 public class API extends LoginClient implements WireAPI {
     private final WebTarget conversationsPath;
@@ -374,7 +374,7 @@ public class API extends LoginClient implements WireAPI {
                 request().
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 accept(MediaType.APPLICATION_JSON).
-                get(new GenericType<ArrayList<Integer>>() {
+                get(new GenericType<>() {
                 });
     }
 
@@ -384,7 +384,7 @@ public class API extends LoginClient implements WireAPI {
                 queryParam("ids", ids.toArray()).
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
-                get(new GenericType<Collection<User>>() {
+                get(new GenericType<>() {
                 });
     }
 
