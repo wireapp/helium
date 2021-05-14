@@ -11,7 +11,7 @@ Wire Client written in Java
     <dependency>
         <groupId>com.wire</groupId>
         <artifactId>helium</artifactId>
-        <version>1.1.0</version>
+        <version>1.1.1</version>
     </dependency>
 <dependencies>
 ```
