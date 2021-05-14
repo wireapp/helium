@@ -12,45 +12,22 @@ import com.wire.xenon.crypto.storage.JdbiStorage;
 import com.wire.xenon.factories.CryptoFactory;
 import com.wire.xenon.factories.StorageFactory;
 import com.wire.xenon.models.AssetKey;
-import com.wire.xenon.models.ImageMessage;
+import com.wire.xenon.models.PhotoPreviewMessage;
+import com.wire.xenon.models.RemoteMessage;
 import com.wire.xenon.models.TextMessage;
 import com.wire.xenon.state.JdbiState;
 import com.wire.xenon.tools.Logger;
 import com.wire.xenon.tools.Util;
-import org.apache.log4j.BasicConfigurator;
-import org.flywaydb.core.Flyway;
-import org.jdbi.v3.core.Jdbi;
-import org.jdbi.v3.sqlobject.SqlObjectPlugin;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.ClientBuilder;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import java.sql.Driver;
-import java.sql.DriverManager;
 import java.util.Collections;
 import java.util.UUID;
 
-public class ApplicationTest {
-    private static final String url = "jdbc:postgresql://localhost/helium";
-    private static final Jdbi dbi = Jdbi.create(url)
-            .installPlugin(new SqlObjectPlugin());
-
-    @BeforeClass
-    public static void before() throws Exception {
-        BasicConfigurator.configure();
-
-        Class<?> driverClass = Class.forName("org.postgresql.Driver");
-        final Driver driver = (Driver) driverClass.newInstance();
-        DriverManager.registerDriver(driver);
-
-        // Migrate DB if needed
-        Flyway flyway = Flyway
-                .configure()
-                .dataSource(url, null, null)
-                .load();
-        flyway.migrate();
-    }
+@Disabled("This is an integration test which requires access to Wire account.")
+public class ApplicationTest extends DatabaseTestBase {
 
     @Test
     public void sendMessagesTest() throws Exception {
@@ -69,12 +46,16 @@ public class ApplicationTest {
             }
 
             @Override
-            public void onImage(WireClient client, ImageMessage msg) {
+            public void onPhotoPreview(WireClient client, PhotoPreviewMessage msg) {
                 Logger.info("onImage: received: %d bytes, %s", msg.getSize(), msg.getMimeType());
+            }
+
+            @Override
+            public void onAssetData(WireClient client, RemoteMessage msg) {
                 try {
-                    final byte[] bytes = client.downloadAsset(msg.getAssetKey(), msg.getAssetToken(), msg.getSha256(), msg.getOtrKey());
+                    final byte[] bytes = client.downloadAsset(msg.getAssetId(), msg.getAssetToken(), msg.getSha256(), msg.getOtrKey());
                 } catch (Exception e) {
-                    Logger.exception("It was not possible to download an image.", e);
+                    Logger.exception("It was not possible to download an asset.", e);
                 }
             }
         };
@@ -111,7 +92,7 @@ public class ApplicationTest {
         final byte[] bytes = Util.getResource("moon.jpg");
         Picture image = new Picture(bytes, "image/jpeg");
         AssetKey assetKey = wireClient.uploadAsset(image);
-        image.setAssetKey(assetKey.key);
+        image.setAssetKey(assetKey.id);
         image.setAssetToken(assetKey.token);
         wireClient.send(image);
 
@@ -120,10 +101,10 @@ public class ApplicationTest {
     }
 
     public StorageFactory getStorageFactory() {
-        return userId -> new JdbiState(userId, dbi);
+        return userId -> new JdbiState(userId, jdbi);
     }
 
     public CryptoFactory getCryptoFactory() {
-        return (userId) -> new CryptoDatabase(userId, new JdbiStorage(dbi));
+        return (userId) -> new CryptoDatabase(userId, new JdbiStorage(jdbi));
     }
 }

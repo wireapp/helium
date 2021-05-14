@@ -26,17 +26,13 @@ import com.wire.xenon.Const;
 import com.wire.xenon.exceptions.AuthException;
 import com.wire.xenon.exceptions.HttpException;
 import com.wire.xenon.models.otr.PreKey;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.Entity;
+import jakarta.ws.rs.client.Invocation;
+import jakarta.ws.rs.client.WebTarget;
+import jakarta.ws.rs.core.*;
 
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.Cookie;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
 import java.util.*;
-import javax.ws.rs.client.Invocation;
-import javax.ws.rs.core.NewCookie;
-import javax.ws.rs.core.Response;
 
 public class LoginClient {
     private static final String LABEL = "wbots";
