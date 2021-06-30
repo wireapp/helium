@@ -1,8 +1,9 @@
 package com.wire.helium;
 
 import com.wire.xenon.tools.Logger;
-import jakarta.websocket.CloseReason;
 import org.glassfish.tyrus.client.ClientManager;
+
+import javax.websocket.CloseReason;
 
 public class SocketReconnectHandler extends ClientManager.ReconnectHandler {
 

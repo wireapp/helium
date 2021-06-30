@@ -11,8 +11,8 @@ import com.wire.xenon.factories.CryptoFactory;
 import com.wire.xenon.factories.StorageFactory;
 import com.wire.xenon.state.State;
 import com.wire.xenon.tools.Logger;
-import jakarta.ws.rs.client.Client;
 
+import javax.ws.rs.client.Client;
 import java.io.IOException;
 import java.util.UUID;
 

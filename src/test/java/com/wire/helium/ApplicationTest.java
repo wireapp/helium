@@ -18,11 +18,11 @@ import com.wire.xenon.models.TextMessage;
 import com.wire.xenon.state.JdbiState;
 import com.wire.xenon.tools.Logger;
 import com.wire.xenon.tools.Util;
-import jakarta.ws.rs.client.Client;
-import jakarta.ws.rs.client.ClientBuilder;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
 import java.util.Collections;
 import java.util.UUID;
 
