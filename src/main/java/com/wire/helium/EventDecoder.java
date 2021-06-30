@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wire.helium.models.Event;
 import com.wire.xenon.tools.Logger;
 import com.wire.xenon.tools.Util;
-import jakarta.websocket.Decoder;
-import jakarta.websocket.EndpointConfig;
 
+import javax.websocket.Decoder;
+import javax.websocket.EndpointConfig;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
