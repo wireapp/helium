@@ -59,8 +59,8 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <jersey.version>2.32</jersey.version>
-        <sl4j.version>1.7.30</sl4j.version>
-        <junit.version>5.7.1</junit.version>
+        <sl4j.version>1.7.32</sl4j.version>
+        <junit.version>5.8.2</junit.version>
     </properties>
 
     <dependencies>
@@ -72,27 +72,34 @@
         <dependency>
             <groupId>jakarta.ws.rs</groupId>
             <artifactId>jakarta.ws.rs-api</artifactId>
+            <!-- This needs to stay fixed on 2.x.y version due to compatibility with dropwizard -->
+            <!--suppress MavenPackageUpdate -->
             <version>2.1.6</version>
         </dependency>
         <dependency>
             <groupId>org.glassfish.tyrus.bundles</groupId>
             <artifactId>tyrus-standalone-client</artifactId>
+            <!-- This needs to stay fixed on 1.x.y version due to compatibility with dropwizard -->
+            <!--suppress MavenPackageUpdate -->
             <version>1.13.1</version>
         </dependency>
         <dependency>
             <groupId>org.glassfish.jersey.core</groupId>
             <artifactId>jersey-client</artifactId>
+            <!-- This needs to stay fixed on 2.x.y version due to compatibility with dropwizard -->
+            <!--suppress MavenPackageUpdate -->
             <version>${jersey.version}</version>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>7.9.0</version>
+            <version>8.1.0</version>
         </dependency>
-
         <dependency>
             <groupId>org.glassfish.jersey.inject</groupId>
             <artifactId>jersey-hk2</artifactId>
+            <!-- This needs to stay fixed on 2.x.y version due to compatibility with dropwizard -->
+            <!--suppress MavenPackageUpdate -->
             <version>${jersey.version}</version>
         </dependency>
         <dependency>
@@ -116,7 +123,7 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.2.20</version>
+            <version>42.3.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -134,7 +141,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.jaxrs</groupId>
             <artifactId>jackson-jaxrs-json-provider</artifactId>
-            <version>2.12.3</version>
+            <version>2.13.0</version>
         </dependency>
     </dependencies>
 
