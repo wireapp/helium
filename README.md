@@ -6,14 +6,15 @@ Wire Client written in Java
 
 - In your `pom.xml`:
 
-```
+```xml
+
 <dependencies>
     <dependency>
         <groupId>com.wire</groupId>
         <artifactId>helium</artifactId>
-        <version>1.2.0</version>
+        <version>1.2.2</version>
     </dependency>
-<dependencies>
+</dependencies>
 ```
 
 ## How to build the project
