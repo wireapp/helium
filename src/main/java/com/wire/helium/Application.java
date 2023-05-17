@@ -209,7 +209,7 @@ public class Application {
                     case "conversation.create":
                         userMessageResource.onNewMessage(
                                 event.id,
-                                payload.convId,
+                                payload.conversation.id,
                                 payload);
                         break;
                     default:
