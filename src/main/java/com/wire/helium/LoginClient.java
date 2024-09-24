@@ -20,8 +20,8 @@ package com.wire.helium;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.wire.helium.models.Access;
+import com.wire.helium.models.BackendConfiguration;
 import com.wire.helium.models.NewClient;
-import com.wire.helium.models.NotificationList;
 import com.wire.xenon.Const;
 import com.wire.xenon.exceptions.AuthException;
 import com.wire.xenon.exceptions.HttpException;
@@ -32,19 +32,25 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.Invocation;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 public class LoginClient {
     private static final String LABEL = "wbots";
     private static final String COOKIE_NAME = "zuid";
+    protected final WebTarget apiVersionPath;
     protected final WebTarget clientsPath;
     private final WebTarget loginPath;
     private final WebTarget accessPath;
     private final WebTarget cookiesPath;
-    private final WebTarget notificationsPath;
 
     public LoginClient(Client client) {
         String host = host();
+        apiVersionPath = client
+                .target(host)
+                .path("api-version");
         loginPath = client
                 .target(host)
                 .path("login");
@@ -54,14 +60,9 @@ public class LoginClient {
         accessPath = client
                 .target(host)
                 .path("access");
-
         cookiesPath = client
                 .target(host)
                 .path("cookies");
-
-        notificationsPath = client
-                .target(host)
-                .path("notifications");
     }
 
     public static String bearer(String token) {
@@ -70,11 +71,33 @@ public class LoginClient {
 
     public String host() {
         String host = System.getProperty(Const.WIRE_BOTS_SDK_API, System.getenv("WIRE_API_HOST"));
-        return host != null ? host : "https://prod-nginz-https.wire.com";
+        return host != null ? host : "https://prod-nginz-https.wire.com/v6";
     }
 
     public Access login(String email, String password) throws HttpException {
         return login(email, password, false);
+    }
+
+    /**
+     * Gets basic info from the connected backend server, like the domain (e.g. wire.com)
+     * and supported api versions.
+     * NOTE: Domain is often necessary in federated environments and may be different than the Host header
+     * coming from responses, making this request valuable.
+     *
+     * @return Deserialized response containing api versions and domain
+     * @throws HttpException on connection issues, 4xx and 5xx are handled internally
+     */
+    public BackendConfiguration getBackendConfiguration() throws HttpException {
+        Response response = apiVersionPath.request().get();
+
+        int status = response.getStatus();
+
+        if (status >= 400) {
+            String entity = response.readEntity(String.class);
+            throw new HttpException(entity, status);
+        }
+
+        return response.readEntity(BackendConfiguration.class);
     }
 
     public Access login(String email, String password, boolean persisted) throws HttpException {
@@ -117,28 +140,38 @@ public class LoginClient {
         return access;
     }
 
-    @Deprecated
-    public String registerClient(String token, String password, ArrayList<PreKey> preKeys, PreKey lastKey) throws HttpException {
+    public String registerClient(String token, String password, ArrayList<PreKey> preKeys,
+                                 Map<String, String> mlsPublicKeys, PreKey lastKey) throws HttpException {
         String deviceClass = "tablet";
         String type = "permanent";
-        return registerClient(token, password, preKeys, lastKey, deviceClass, type, LABEL);
+        return registerClient(token, password, preKeys, mlsPublicKeys, lastKey, deviceClass, type, LABEL);
     }
 
     /**
+     * Registers a new client (device like phone or desktop) for an authenticated user.
+     *
+     * <p>
+     *         Must pass Proteus OR MLS keys, not both. Keys must be generated beforehand with a given
+     *         crypto session targeted for the requesting user.
+     * </p>
+     *
+     * @param token authentication token from login/cookie
      * @param password Wire password
+     * @param preKeys (Optional) List of Proteus prekeys to pass initially to the backend
+     * @param mlsPublicKeys (Optional) List of MLS keys to pass initially to the backend
+     * @param lastKey (Optional) Proteus backup key to pass initially to the backend
      * @param clazz    "tablet" | "phone" | "desktop"
      * @param type     "permanent" | "temporary"
      * @param label    can be anything
      * @return Client id
      */
-    public String registerClient(String token, String password, ArrayList<PreKey> preKeys, PreKey lastKey,
-                                 String clazz, String type, String label) throws HttpException {
+    public String registerClient(String token, String password, ArrayList<PreKey> preKeys, Map<String, String> mlsPublicKeys,
+                                 PreKey lastKey, String clazz, String type, String label) throws HttpException {
         NewClient newClient = new NewClient();
         newClient.password = password;
         newClient.lastkey = lastKey;
         newClient.prekeys = preKeys;
-        newClient.sigkeys.enckey = Base64.getEncoder().encodeToString(new byte[32]);
-        newClient.sigkeys.mackey = Base64.getEncoder().encodeToString(new byte[32]);
+        newClient.mlsPublicKeys = mlsPublicKeys;
         newClient.clazz = clazz;
         newClient.label = label;
         newClient.type = type;
@@ -216,6 +249,7 @@ public class LoginClient {
         removeCookies.labels = Collections.singletonList(LABEL);
 
         Response response = cookiesPath.
+                path("remove").
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 post(Entity.entity(removeCookies, MediaType.APPLICATION_JSON));
@@ -229,38 +263,6 @@ public class LoginClient {
             throw response.readEntity(HttpException.class);
         }
 
-    }
-
-    public NotificationList retrieveNotifications(String client, UUID since, String token, int size) throws HttpException {
-        WebTarget webTarget = notificationsPath
-                .queryParam("client", client)
-                .queryParam("size", size);
-
-        if (since != null) {
-            webTarget = webTarget
-                    .queryParam("since", since.toString());
-        }
-
-        Response response = webTarget
-                .request(MediaType.APPLICATION_JSON)
-                .accept(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                .get();
-
-        int status = response.getStatus();
-
-        if (status == 200) {
-            return response.readEntity(NotificationList.class);
-        } else if (status == 404) {  //todo what???
-            return response.readEntity(NotificationList.class);
-        } else if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
-            response.readEntity(String.class);
-            throw new AuthException(status);
-        } else if (status == 403) {
-            throw response.readEntity(AuthException.class);
-        }
-
-        throw response.readEntity(HttpException.class);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

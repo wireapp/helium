@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.wire.xenon.models.otr.PreKey;
 
 import java.util.List;
+import java.util.Map;
 
 public class NewClient {
     @JsonProperty("lastkey")
@@ -42,14 +43,6 @@ public class NewClient {
     @JsonProperty
     public String label;
 
-    @JsonProperty
-    public Sig sigkeys = new Sig();
-
-    public static class Sig {
-        @JsonProperty
-        public String enckey;
-
-        @JsonProperty
-        public String mackey;
-    }
+    @JsonProperty("mls_public_keys")
+    public Map<String, String> mlsPublicKeys;
 }

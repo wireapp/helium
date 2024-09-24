@@ -20,16 +20,21 @@ package com.wire.helium;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.protobuf.ByteString;
 import com.wire.helium.models.Connection;
+import com.wire.helium.models.NotificationList;
+import com.wire.messages.Otr;
 import com.wire.xenon.WireAPI;
 import com.wire.xenon.assets.IAsset;
 import com.wire.xenon.backend.models.Conversation;
 import com.wire.xenon.backend.models.Member;
-import com.wire.xenon.backend.models.Service;
+import com.wire.xenon.backend.models.QualifiedId;
 import com.wire.xenon.backend.models.User;
+import com.wire.xenon.exceptions.AuthException;
 import com.wire.xenon.exceptions.HttpException;
 import com.wire.xenon.models.AssetKey;
 import com.wire.xenon.models.otr.*;
+import com.wire.xenon.tools.Logger;
 import com.wire.xenon.tools.Util;
 
 import javax.ws.rs.client.Client;
@@ -41,8 +46,10 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import java.io.ByteArrayOutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class API extends LoginClient implements WireAPI {
@@ -52,14 +59,15 @@ public class API extends LoginClient implements WireAPI {
     private final WebTarget teamsPath;
     private final WebTarget connectionsPath;
     private final WebTarget selfPath;
+    private final WebTarget notificationsPath;
 
     private final String token;
-    private final String convId;
+    private final QualifiedId convId;
 
-    public API(Client client, UUID convId, String token) {
+    public API(Client client, QualifiedId convId, String token) {
         super(client);
 
-        this.convId = convId != null ? convId.toString() : null;
+        this.convId = convId;
         this.token = token;
 
         WebTarget target = client
@@ -67,52 +75,154 @@ public class API extends LoginClient implements WireAPI {
 
         conversationsPath = target.path("conversations");
         usersPath = target.path("users");
-        assetsPath = target.path("assets/v3");
+        assetsPath = target.path("assets");
         teamsPath = target.path("teams");
         connectionsPath = target.path("connections");
         selfPath = target.path("self");
+        notificationsPath = target.path("notifications");
     }
 
+    /**
+     * Sends E2E encrypted messages to all clients already known, with opened cryptobox sessions.
+     *
+     * After sending those, the backend will return the list of clients that the service has no connection yet,
+     * so prekeys for those specific clients can be downloaded a new cryptobox sessions initiated.
+     * @param msg the message with the already encrypted clients
+     * @param ignoreMissing when true, missing clients won't be blocking and just be returned,
+     *                      when false, any missing recipient will block the message to be sent to anyone
+     * @return devices that had issues or still need the message
+     * @throws HttpException
+     */
     @Override
-    public Devices sendMessage(OtrMessage msg, Object... ignoreMissing) throws HttpException {
+    public Devices sendMessage(OtrMessage msg, boolean ignoreMissing) throws HttpException {
+        final Otr.QualifiedNewOtrMessage.Builder protoMsgBuilder = createProtoMessageBuilder(msg);
+
+        if (ignoreMissing) {
+            protoMsgBuilder.setIgnoreAll(Otr.ClientMismatchStrategy.IgnoreAll.getDefaultInstance());
+        } else {
+            protoMsgBuilder.setReportAll(Otr.ClientMismatchStrategy.ReportAll.getDefaultInstance());
+        }
+        final Otr.QualifiedNewOtrMessage protoMsg = protoMsgBuilder.build();
+
         Response response = conversationsPath.
-                path(convId).
-                path("otr/messages").
+                path(convId.domain).
+                path(convId.id.toString()).
+                path("proteus/messages").
                 queryParam("ignore_missing", ignoreMissing).
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
-                post(Entity.entity(msg, MediaType.APPLICATION_JSON));
+                post(Entity.entity(protoMsg, "application/x-protobuf"));
 
         int statusCode = response.getStatus();
         if (statusCode == 412) {
             return response.readEntity(Devices.class);
         } else if (statusCode >= 400) {
-            throw new HttpException(response.getStatusInfo().getReasonPhrase(), response.getStatus());
+            String msgError = response.readEntity(String.class);
+            Logger.error("SendMessage http error: %s, status: %d", msgError, response.getStatus());
+            throw new HttpException(msgError, response.getStatus());
         }
 
         response.close();
         return new Devices();
     }
 
+    /**
+     * Sends E2E encrypted messages to all clients already known, with opened cryptobox sessions.
+     *
+     * After sending those, the backend will return the list of clients that the service has no connection yet,
+     * so prekeys for those specific clients can be downloaded a new cryptobox sessions initiated.
+     * @param msg the message with the already encrypted clients
+     * @param userId If this users' client is missing, the message is not sent
+     * @return devices that had issues or still need the message
+     * @throws HttpException
+     */
     @Override
-    public Devices sendPartialMessage(OtrMessage msg, UUID userId) throws HttpException {
+    public Devices sendPartialMessage(OtrMessage msg, QualifiedId userId) throws HttpException {
+        final Otr.QualifiedNewOtrMessage.Builder protoMsgBuilder = createProtoMessageBuilder(msg);
+        final Otr.ClientMismatchStrategy.ReportOnly reportOnly = Otr.ClientMismatchStrategy.ReportOnly.newBuilder()
+            .addAllUserIds(
+                List.of(
+                    Otr.QualifiedUserId.newBuilder()
+                        .setDomain(userId.domain)
+                        .setId(userId.id.toString())
+                        .build()
+                )
+            )
+            .build();
+        protoMsgBuilder.setReportOnly(reportOnly);
+        final Otr.QualifiedNewOtrMessage protoMsg = protoMsgBuilder.build();
+
         Response response = conversationsPath.
-                path(convId).
-                path("otr/messages").
-                queryParam("report_missing", userId).
+                path(convId.domain).
+                path(convId.id.toString()).
+                path("proteus/messages").
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
-                post(Entity.entity(msg, MediaType.APPLICATION_JSON));
+                post(Entity.entity(protoMsg, "application/x-protobuf"));
 
         int statusCode = response.getStatus();
         if (statusCode == 412) {
             return response.readEntity(Devices.class);
         } else if (statusCode >= 400) {
-            throw new HttpException(response.getStatusInfo().getReasonPhrase(), response.getStatus());
+            String msgError = response.readEntity(String.class);
+            Logger.error("SendPartialMessage http error: %s, status: %d", msgError, response.getStatus());
+            throw new HttpException(msgError, response.getStatus());
         }
 
         response.close();
         return new Devices();
+    }
+
+    private Otr.QualifiedNewOtrMessage.Builder createProtoMessageBuilder(OtrMessage msg) {
+        final Otr.QualifiedNewOtrMessage.Builder messageBuilder = Otr.QualifiedNewOtrMessage.newBuilder();
+
+        final Otr.ClientId.Builder clientBuilder = Otr.ClientId.newBuilder();
+        clientBuilder.setClient(Long.parseLong(msg.getSender(), 16));
+        final Otr.ClientId clientId = clientBuilder.build();
+        messageBuilder.setSender(clientId);
+
+        Map<String, Map<UUID, ClientCipher>> domainBasedMap = recipientsToMap(msg.getRecipients());
+        List<Otr.QualifiedUserEntry> protoRecipients = domainBasedMap.entrySet().stream()
+            .map(it ->
+                Otr.QualifiedUserEntry.newBuilder()
+                    .setDomain(it.getKey())
+                    .addAllEntries(it.getValue().entrySet().stream()
+                        .map(u ->
+                            Otr.UserEntry.newBuilder()
+                                .setUser(Otr.UserId.newBuilder().setUuid(getProtoBytesFromUUID(u.getKey())))
+                                .addAllClients(u.getValue().entrySet().stream()
+                                    .map(c ->
+                                        Otr.ClientEntry.newBuilder()
+                                            .setClient(Otr.ClientId.newBuilder().setClient(Long.parseLong(c.getKey(), 16)).build())
+                                            .setText(ByteString.copyFromUtf8(c.getValue()))
+                                            .build()
+                                    )
+                                    .collect(Collectors.toList()))
+                                .build()
+                        )
+                        .collect(Collectors.toList()))
+                    .build()
+            )
+            .collect(Collectors.toList());
+        messageBuilder.addAllRecipients(protoRecipients);
+
+        return messageBuilder;
+    }
+
+    public static ByteString getProtoBytesFromUUID(UUID uuid) {
+        ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
+        bb.putLong(uuid.getMostSignificantBits());
+        bb.putLong(uuid.getLeastSignificantBits());
+        return ByteString.copyFrom(bb.array());
+    }
+
+    public Map<String, Map<UUID, ClientCipher>> recipientsToMap(Recipients recipients) {
+        Map<String, Map<UUID, ClientCipher>> domainBasedMap = new HashMap<>();
+        for (Map.Entry<QualifiedId, ClientCipher> recipient: recipients.entrySet()) {
+            final Map<UUID, ClientCipher> uuidClientCipherMap = domainBasedMap.computeIfAbsent(recipient.getKey().domain, k -> new ConcurrentHashMap<>());
+            uuidClientCipherMap.put(recipient.getKey().id, recipient.getValue());
+        }
+        return domainBasedMap;
     }
 
     @Override
@@ -120,19 +230,27 @@ public class API extends LoginClient implements WireAPI {
         if (missing.isEmpty())
             return new PreKeys();
 
-        return usersPath.path("prekeys").
+        Response response = usersPath.path("list-prekeys").
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 accept(MediaType.APPLICATION_JSON).
-                post(Entity.entity(missing, MediaType.APPLICATION_JSON), PreKeys.class);
+                post(Entity.entity(missing, MediaType.APPLICATION_JSON));
+
+        if (response.getStatus() >= 400) {
+            String msgError = response.readEntity(String.class);
+            Logger.error("GetPreKeys http error: %s, status: %d", msgError, response.getStatus());
+            throw new RuntimeException(msgError);
+        }
+        return response.readEntity(PreKeys.class);
     }
 
     @Override
-    public byte[] downloadAsset(String assetKey, String assetToken) throws HttpException {
+    public byte[] downloadAsset(String assetKey, String domain, String assetToken) throws HttpException {
         Invocation.Builder req = assetsPath
+                .path(domain)
                 .path(assetKey)
-                .queryParam("access_token", token)
-                .request();
+                .request()
+                .header(HttpHeaders.AUTHORIZATION, bearer(token));
 
         if (assetToken != null)
             req.header("Asset-Token", assetToken);
@@ -140,26 +258,30 @@ public class API extends LoginClient implements WireAPI {
         Response response = req.get();
 
         if (response.getStatus() >= 400) {
-            String log = String.format("%s. AssetId: %s", response.readEntity(String.class), assetKey);
-            throw new HttpException(log, response.getStatus());
+            String msgError = response.readEntity(String.class);
+            Logger.error("DownloadAsset http error %s. AssetId: %s", response.readEntity(String.class), assetKey);
+            throw new HttpException(msgError, response.getStatus());
         }
 
         return response.readEntity(byte[].class);
     }
 
     @Override
-    public void acceptConnection(UUID user) throws HttpException {
+    public void acceptConnection(QualifiedId user) throws HttpException {
         Connection connection = new Connection();
         connection.setStatus("accepted");
 
         Response response = connectionsPath.
-                path(user.toString()).
+                path(user.domain).
+                path(user.id.toString()).
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 put(Entity.entity(connection, MediaType.APPLICATION_JSON));
 
         if (response.getStatus() >= 400) {
-            throw new HttpException(response.readEntity(String.class), response.getStatus());
+            String msgError = response.readEntity(String.class);
+            Logger.error("AcceptConnection http error: %s, status: %d", msgError, response.getStatus());
+            throw new HttpException(msgError, response.getStatus());
         }
         response.close();
     }
@@ -203,17 +325,30 @@ public class API extends LoginClient implements WireAPI {
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .post(Entity.entity(os.toByteArray(), "multipart/mixed; boundary=frontier"));
 
+        if (response.getStatus() >= 400) {
+            String msgError = response.readEntity(String.class);
+            Logger.error("UploadAsset http error: %s, status: %d", msgError, response.getStatus());
+            throw new HttpException(msgError, response.getStatus());
+        }
         return response.readEntity(AssetKey.class);
     }
 
     @Override
     public Conversation getConversation() {
-        _Conv conv = conversationsPath.
-                path(convId).
+        Response response = conversationsPath.
+                path(convId.domain).
+                path(convId.id.toString()).
                 request().
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
-                get(_Conv.class);
+                get();
 
+        if (response.getStatus() >= 400) {
+            String msgError = response.readEntity(String.class);
+            Logger.error("GetConversation http error: %s, status: %d", msgError, response.getStatus());
+            throw new RuntimeException(msgError);
+        }
+
+        _Conv conv = response.readEntity(_Conv.class);
         Conversation ret = new Conversation();
         ret.name = conv.name;
         ret.id = conv.id;
@@ -226,26 +361,28 @@ public class API extends LoginClient implements WireAPI {
         Response response = teamsPath.
                 path(teamId.toString()).
                 path("conversations").
-                path(convId).
+                path(convId.id.toString()).
                 request().
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 delete();
 
         if (response.getStatus() >= 400) {
-            throw new HttpException(response.readEntity(String.class), response.getStatus());
+            String msgError = response.readEntity(String.class);
+            Logger.error("DeleteConversation http error: %s, status: %d", msgError, response.getStatus());
+            throw new HttpException(msgError, response.getStatus());
         }
 
         return response.getStatus() == 200;
     }
 
     @Override
-    public User addService(UUID serviceId, UUID providerId) throws HttpException {
+    public void addService(UUID serviceId, UUID providerId) throws HttpException {
         _Service service = new _Service();
         service.service = serviceId;
         service.provider = providerId;
 
         Response response = conversationsPath.
-                path(convId).
+                path(convId.id.toString()).
                 path("bots").
                 request().
                 accept(MediaType.APPLICATION_JSON).
@@ -253,39 +390,34 @@ public class API extends LoginClient implements WireAPI {
                 post(Entity.entity(service, MediaType.APPLICATION_JSON));
 
         if (response.getStatus() >= 400) {
-            String msg = response.readEntity(String.class);
-            throw new HttpException(msg, response.getStatus());
+            String msgError = response.readEntity(String.class);
+            Logger.error("AddService http error: %s, status: %d", msgError, response.getStatus());
+            throw new HttpException(msgError, response.getStatus());
         }
-
-        User user = response.readEntity(User.class);
-        user.service = new Service();
-        user.service.id = serviceId;
-        user.service.providerId = providerId;
-        return user;
     }
 
     @Override
-    public User addParticipants(UUID... userIds) throws HttpException {
+    public void addParticipants(QualifiedId... userIds) throws HttpException {
         _NewConv newConv = new _NewConv();
         newConv.users = Arrays.asList(userIds);
 
         Response response = conversationsPath.
-                path(convId).
+                path(convId.domain).
+                path(convId.id.toString()).
                 path("members").
                 request().
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 post(Entity.entity(newConv, MediaType.APPLICATION_JSON));
 
         if (response.getStatus() >= 400) {
-            String msg = response.readEntity(String.class);
-            throw new HttpException(msg, response.getStatus());
+            String msgError = response.readEntity(String.class);
+            Logger.error("AddParticipants http error: %s, status: %d", msgError, response.getStatus());
+            throw new HttpException(msgError, response.getStatus());
         }
-
-        return response.readEntity(User.class);
     }
 
     @Override
-    public Conversation createConversation(String name, UUID teamId, List<UUID> users) throws HttpException {
+    public Conversation createConversation(String name, UUID teamId, List<QualifiedId> users) throws HttpException {
         _NewConv newConv = new _NewConv();
         newConv.name = name;
         newConv.users = users;
@@ -300,7 +432,9 @@ public class API extends LoginClient implements WireAPI {
                 post(Entity.entity(newConv, MediaType.APPLICATION_JSON));
 
         if (response.getStatus() >= 400) {
-            throw new HttpException(response.readEntity(String.class), response.getStatus());
+            String msgError = response.readEntity(String.class);
+            Logger.error("AddService http error: %s, status: %d", msgError, response.getStatus());
+            throw new HttpException(msgError, response.getStatus());
         }
 
         _Conv conv = response.readEntity(_Conv.class);
@@ -313,8 +447,7 @@ public class API extends LoginClient implements WireAPI {
     }
 
     @Override
-    public Conversation createOne2One(UUID teamId, UUID userId) throws HttpException {
-
+    public Conversation createOne2One(UUID teamId, QualifiedId userId) throws HttpException {
         _NewConv newConv = new _NewConv();
         newConv.users = Collections.singletonList(userId);
 
@@ -330,7 +463,9 @@ public class API extends LoginClient implements WireAPI {
                 .post(Entity.entity(newConv, MediaType.APPLICATION_JSON));
 
         if (response.getStatus() >= 400) {
-            throw new HttpException(response.readEntity(String.class), response.getStatus());
+            String msgError = response.readEntity(String.class);
+            Logger.error("CreateOne2One http error: %s, status: %d", msgError, response.getStatus());
+            throw new HttpException(msgError, response.getStatus());
         }
 
         _Conv conv = response.readEntity(_Conv.class);
@@ -343,11 +478,13 @@ public class API extends LoginClient implements WireAPI {
     }
 
     @Override
-    public void leaveConversation(UUID user) throws HttpException {
+    public void leaveConversation(QualifiedId user) throws HttpException {
         Response response = conversationsPath
-                .path(convId)
+                .path(convId.domain)
+                .path(convId.id.toString())
                 .path("members")
-                .path(user.toString())
+                .path(user.domain)
+                .path(user.id.toString())
                 .request(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .delete();
@@ -357,13 +494,13 @@ public class API extends LoginClient implements WireAPI {
         }
     }
 
+    /**
+     * Unused in base api, only needed for bot specific purposes which already extend this API.
+     * @param preKeys list of pre-generated prekeys to upload to the backend
+     */
     @Override
     public void uploadPreKeys(ArrayList<PreKey> preKeys) {
-        usersPath.path("prekeys").
-                request(MediaType.APPLICATION_JSON).
-                header(HttpHeaders.AUTHORIZATION, bearer(token)).
-                accept(MediaType.APPLICATION_JSON).
-                post(Entity.entity(preKeys, MediaType.APPLICATION_JSON));
+        throw new UnsupportedOperationException("Bot specific feature, use a more specific API implementation");
     }
 
     @Override
@@ -374,53 +511,66 @@ public class API extends LoginClient implements WireAPI {
                 request().
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 accept(MediaType.APPLICATION_JSON).
-                get(new GenericType<>() {
-                });
+                get(new GenericType<>() {});
     }
 
+    /**
+     * Unused in base api, only needed for bot specific purposes which already extend this API.
+     * @param ids list of user ids
+     */
     @Override
-    public Collection<User> getUsers(Collection<UUID> ids) {
-        return usersPath.
-                queryParam("ids", ids.toArray()).
-                request(MediaType.APPLICATION_JSON).
-                header(HttpHeaders.AUTHORIZATION, bearer(token)).
-                get(new GenericType<>() {
-                });
+    public Collection<User> getUsers(Collection<QualifiedId> ids) {
+        throw new UnsupportedOperationException("Bot specific feature, use a more specific API implementation");
     }
 
-    public User getUser(UUID userId) throws HttpException {
-        Response response = usersPath.
-                path(userId.toString()).
-                request(MediaType.APPLICATION_JSON).
-                header(HttpHeaders.AUTHORIZATION, bearer(token)).
-                get();
+    /**
+     * Unused in base api, only needed for bot specific purposes which already extend this API.
+     * @param userId user id
+     */
+    @Override
+    public User getUser(QualifiedId userId) throws HttpException {
+        throw new UnsupportedOperationException("Bot specific feature, use a more specific API implementation");
+    }
 
-        if (response.getStatus() != 200) {
-            throw new HttpException(response.readEntity(String.class), response.getStatus());
+    public NotificationList retrieveNotifications(String client, UUID since, int size) throws HttpException {
+        WebTarget webTarget = notificationsPath
+                .queryParam("client", client)
+                .queryParam("size", size);
+
+        if (since != null) {
+            webTarget = webTarget
+                    .queryParam("since", since.toString());
         }
 
-        return response.readEntity(User.class);
-    }
+        Response response = webTarget
+                .request(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                .get();
 
-    public UUID getUserId(String handle) throws HttpException {
-        Response response = usersPath.
-                path("handles").
-                path(handle).
-                request(MediaType.APPLICATION_JSON).
-                header(HttpHeaders.AUTHORIZATION, bearer(token)).
-                get();
+        int status = response.getStatus();
 
-        if (response.getStatus() != 200) {
-            throw new HttpException(response.readEntity(String.class), response.getStatus());
+        if (status == 200) {
+            return response.readEntity(NotificationList.class);
+        } else if (status == 404) {
+            final NotificationList emptyNotifications = new NotificationList();
+            emptyNotifications.hasMore = false;
+            emptyNotifications.notifications = new ArrayList<>();
+            return emptyNotifications;
+        } else if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
+            response.readEntity(String.class);
+            throw new AuthException(status);
+        } else if (status == 403) {
+            throw response.readEntity(AuthException.class);
         }
 
-        _TeamMember teamMember = response.readEntity(_TeamMember.class);
-        return teamMember.user;
+        throw response.readEntity(HttpException.class);
     }
 
-    public boolean hasDevice(UUID userId, String clientId) {
+    public boolean hasDevice(QualifiedId userId, String clientId) {
         Response response = usersPath.
-                path(userId.toString()).
+                path(userId.domain).
+                path(userId.id.toString()).
                 path("clients").
                 path(clientId).
                 request(MediaType.APPLICATION_JSON).
@@ -439,40 +589,10 @@ public class API extends LoginClient implements WireAPI {
                 get(User.class);
     }
 
-    public UUID getTeam() throws HttpException {
-        Response response = teamsPath
-                .request(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                .accept(MediaType.APPLICATION_JSON)
-                .get();
-
-        if (response.getStatus() != 200) {
-            throw new HttpException(response.readEntity(String.class), response.getStatus());
-        }
-
-        _Teams teams = response.readEntity(_Teams.class);
-        if (teams.teams.isEmpty())
-            return null;
-
-        return teams.teams.get(0).id;
-    }
-
-    public Collection<UUID> getTeamMembers(UUID teamId) {
-        _Team team = teamsPath
-                .path(teamId.toString())
-                .path("members")
-                .request(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                .accept(MediaType.APPLICATION_JSON)
-                .get(_Team.class);
-
-        return team.members.stream().map(x -> x.user).collect(Collectors.toList());
-    }
-
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class _Conv {
-        @JsonProperty
-        public UUID id;
+        @JsonProperty("qualified_conversation")
+        public QualifiedId id;
 
         @JsonProperty
         public String name;
@@ -482,7 +602,7 @@ public class API extends LoginClient implements WireAPI {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    static class _Members {
+    public static class _Members {
         @JsonProperty
         public List<Member> others;
     }
@@ -493,28 +613,6 @@ public class API extends LoginClient implements WireAPI {
         public UUID provider;
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class _Team {
-        @JsonProperty
-        public UUID id;
-        @JsonProperty
-        public String name;
-        @JsonProperty
-        public List<_TeamMember> members;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class _TeamMember {
-        @JsonProperty
-        public UUID user;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    static class _Teams {
-        @JsonProperty
-        public ArrayList<_Team> teams;
-    }
-
     static class _NewConv {
         @JsonProperty
         public String name;
@@ -522,8 +620,8 @@ public class API extends LoginClient implements WireAPI {
         @JsonProperty
         public _TeamInfo team;
 
-        @JsonProperty
-        public List<UUID> users;
+        @JsonProperty("qualified_users")
+        public List<QualifiedId> users;
 
         @JsonProperty
         public _Service service;
@@ -535,13 +633,5 @@ public class API extends LoginClient implements WireAPI {
 
         @JsonProperty
         public boolean managed;
-    }
-
-    static class _Device {
-        @JsonProperty("id")
-        public String clientId;
-
-        @JsonProperty("class")
-        public String type;
     }
 }

@@ -6,8 +6,11 @@ import com.wire.bots.cryptobox.IStorage;
 import com.wire.helium.helpers.DummyAPI;
 import com.wire.helium.helpers.MemStorage;
 import com.wire.helium.helpers.Util;
+import com.wire.xenon.WireClient;
+import com.wire.xenon.WireClientBase;
 import com.wire.xenon.assets.MessageText;
 import com.wire.xenon.backend.models.NewBot;
+import com.wire.xenon.backend.models.QualifiedId;
 import com.wire.xenon.crypto.CryptoDatabase;
 import com.wire.xenon.crypto.storage.JdbiStorage;
 import com.wire.xenon.models.otr.OtrMessage;
@@ -28,23 +31,21 @@ public class End2EndTest extends DatabaseTestBase {
     public void beforeEach() {
         rootFolder = "helium-unit-test-" + UUID.randomUUID();
         storage = new JdbiStorage(jdbi);
-        flyway.migrate();
     }
 
     @AfterEach
     public void afterEach() throws IOException {
-        flyway.clean();
         Util.deleteDir(rootFolder);
     }
 
     @Test
     public void testAliceToAlice() throws Exception {
-        UUID aliceId = UUID.randomUUID();
+        QualifiedId aliceId = new QualifiedId(UUID.randomUUID(), UUID.randomUUID().toString());
         String client1 = "alice1_" + UUID.randomUUID();
 
         NewBot state = new NewBot();
-        state.id = aliceId;
-        state.client = aliceId.toString();
+        state.id = aliceId.id;
+        state.client = aliceId.id.toString();
 
         CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, rootFolder + "/testAliceToAlice/1");
         CryptoDatabase aliceCrypto1 = new CryptoDatabase(aliceId, storage, rootFolder + "/testAliceToAlice/2");
@@ -52,7 +53,7 @@ public class End2EndTest extends DatabaseTestBase {
         DummyAPI api = new DummyAPI();
         api.addDevice(aliceId, client1, aliceCrypto1.box().newLastPreKey());
 
-        WireClientImp aliceClient = new WireClientImp(api, aliceCrypto, state, null);
+        WireClient aliceClient = new WireClientBase(api, aliceCrypto, state);
 
         for (int i = 0; i < 10; i++) {
             String text = "Hello Alice, This is Alice!";
@@ -69,8 +70,8 @@ public class End2EndTest extends DatabaseTestBase {
 
     @Test
     public void testAliceToBob() throws Exception {
-        UUID bobId = UUID.randomUUID();
-        UUID aliceId = UUID.randomUUID();
+        QualifiedId bobId = new QualifiedId(UUID.randomUUID(), UUID.randomUUID().toString());
+        QualifiedId aliceId = new QualifiedId(UUID.randomUUID(), UUID.randomUUID().toString());
         String client1 = "bob1";
 
         MemStorage storage = new MemStorage();
@@ -82,9 +83,9 @@ public class End2EndTest extends DatabaseTestBase {
         api.addDevice(bobId, client1, bobCrypto.box().newLastPreKey());
 
         NewBot state = new NewBot();
-        state.id = aliceId;
+        state.id = aliceId.id;
         state.client = "alice1";
-        WireClientImp aliceClient = new WireClientImp(api, aliceCrypto, state, null);
+        WireClient aliceClient = new WireClientBase(api, aliceCrypto, state);
 
         for (int i = 0; i < 10; i++) {
             String text = "Hello Bob, This is Alice!";
@@ -101,8 +102,8 @@ public class End2EndTest extends DatabaseTestBase {
 
     @Test
     public void testMultiDevicePostgres() throws Exception {
-        UUID bobId = UUID.randomUUID();
-        UUID aliceId = UUID.randomUUID();
+        QualifiedId bobId = new QualifiedId(UUID.randomUUID(), UUID.randomUUID().toString());
+        QualifiedId aliceId = new QualifiedId(UUID.randomUUID(), UUID.randomUUID().toString());
         String client1 = "bob1_" + UUID.randomUUID();
         String client2 = "bob2_" + UUID.randomUUID();
         String client3 = "alice3_" + UUID.randomUUID();
@@ -120,9 +121,9 @@ public class End2EndTest extends DatabaseTestBase {
         CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, rootFolder + "/testMultiDevicePostgres/alice");
 
         NewBot state = new NewBot();
-        state.id = aliceId;
+        state.id = aliceId.id;
         state.client = aliceCl;
-        WireClientImp aliceClient = new WireClientImp(api, aliceCrypto, state, null);
+        WireClient aliceClient = new WireClientBase(api, aliceCrypto, state);
 
         for (int i = 0; i < 10; i++) {
             String text = "Hello Bob, This is Alice!";
