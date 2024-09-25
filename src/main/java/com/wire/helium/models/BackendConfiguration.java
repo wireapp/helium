@@ -9,10 +9,10 @@ import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BackendConfiguration {
-    //Api version currently in dev stage and not production ready
+    //Api versions currently in dev stage and not production ready
     @JsonProperty
     @NotNull
-    public Integer development;
+    public List<Integer> development = new ArrayList<>();
 
     @JsonProperty
     @NotNull

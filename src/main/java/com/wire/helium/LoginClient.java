@@ -40,6 +40,7 @@ import java.util.Map;
 public class LoginClient {
     private static final String LABEL = "wbots";
     private static final String COOKIE_NAME = "zuid";
+    protected static final String BACKEND_API_VERSION = "v6";
     protected final WebTarget apiVersionPath;
     protected final WebTarget clientsPath;
     private final WebTarget loginPath;
@@ -47,22 +48,13 @@ public class LoginClient {
     private final WebTarget cookiesPath;
 
     public LoginClient(Client client) {
-        String host = host();
-        apiVersionPath = client
-                .target(host)
-                .path("api-version");
-        loginPath = client
-                .target(host)
-                .path("login");
-        clientsPath = client
-                .target(host)
-                .path("clients");
-        accessPath = client
-                .target(host)
-                .path("access");
-        cookiesPath = client
-                .target(host)
-                .path("cookies");
+        WebTarget baseTarget = client.target(host());
+        WebTarget versionedTarget = baseTarget.path(BACKEND_API_VERSION);
+        apiVersionPath = baseTarget.path("api-version");
+        loginPath = versionedTarget.path("login");
+        clientsPath = versionedTarget.path("clients");
+        accessPath = versionedTarget.path("access");
+        cookiesPath = versionedTarget.path("cookies");
     }
 
     public static String bearer(String token) {
@@ -71,7 +63,7 @@ public class LoginClient {
 
     public String host() {
         String host = System.getProperty(Const.WIRE_BOTS_SDK_API, System.getenv("WIRE_API_HOST"));
-        return host != null ? host : "https://prod-nginz-https.wire.com/v6";
+        return host != null ? host : "https://prod-nginz-https.wire.com";
     }
 
     public Access login(String email, String password) throws HttpException {

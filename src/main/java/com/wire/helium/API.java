@@ -70,16 +70,15 @@ public class API extends LoginClient implements WireAPI {
         this.convId = convId;
         this.token = token;
 
-        WebTarget target = client
-                .target(host());
+        WebTarget versionedTarget = client.target(host()).path(BACKEND_API_VERSION);
 
-        conversationsPath = target.path("conversations");
-        usersPath = target.path("users");
-        assetsPath = target.path("assets");
-        teamsPath = target.path("teams");
-        connectionsPath = target.path("connections");
-        selfPath = target.path("self");
-        notificationsPath = target.path("notifications");
+        conversationsPath = versionedTarget.path("conversations");
+        usersPath = versionedTarget.path("users");
+        assetsPath = versionedTarget.path("assets");
+        teamsPath = versionedTarget.path("teams");
+        connectionsPath = versionedTarget.path("connections");
+        selfPath = versionedTarget.path("self");
+        notificationsPath = versionedTarget.path("notifications");
     }
 
     /**
