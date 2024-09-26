@@ -432,7 +432,7 @@ public class API extends LoginClient implements WireAPI {
 
         if (response.getStatus() >= 400) {
             String msgError = response.readEntity(String.class);
-            Logger.error("AddService http error: %s, status: %d", msgError, response.getStatus());
+            Logger.error("CreateConversation http error: %s, status: %d", msgError, response.getStatus());
             throw new HttpException(msgError, response.getStatus());
         }
 
@@ -489,7 +489,9 @@ public class API extends LoginClient implements WireAPI {
                 .delete();
 
         if (response.getStatus() >= 400) {
-            throw new HttpException(response.readEntity(String.class), response.getStatus());
+            String msgError = response.readEntity(String.class);
+            Logger.error("LeaveConversation http error: %s, status: %d", msgError, response.getStatus());
+            throw new HttpException(msgError, response.getStatus());
         }
     }
 
@@ -504,13 +506,21 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public ArrayList<Integer> getAvailablePrekeys(String clientId) {
-        return clientsPath.
+        Response response = clientsPath.
                 path(clientId).
                 path("prekeys").
                 request().
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 accept(MediaType.APPLICATION_JSON).
-                get(new GenericType<>() {});
+                get();
+
+        if (response.getStatus() >= 400) {
+            String msgError = response.readEntity(String.class);
+            Logger.error("GetAvailablePrekeys http error: %s, status: %d", msgError, response.getStatus());
+            throw new RuntimeException(msgError);
+        }
+
+        return response.readEntity(new GenericType<>() {});
     }
 
     /**
@@ -523,12 +533,25 @@ public class API extends LoginClient implements WireAPI {
     }
 
     /**
-     * Unused in base api, only needed for bot specific purposes which already extend this API.
-     * @param userId user id
+     * Get the metadata of a specific user based on its id.
+     * @param userId qualified user id
      */
     @Override
     public User getUser(QualifiedId userId) throws HttpException {
-        throw new UnsupportedOperationException("Bot specific feature, use a more specific API implementation");
+        Response response = usersPath
+            .path(userId.domain)
+            .path(userId.id.toString())
+            .request()
+            .header(HttpHeaders.AUTHORIZATION, bearer(token))
+            .accept(MediaType.APPLICATION_JSON)
+            .get();
+
+        if (response.getStatus() >= 400) {
+            String msgError = response.readEntity(String.class);
+            Logger.error("GetUser http error: %s, status: %d", msgError, response.getStatus());
+            throw new RuntimeException(msgError);
+        }
+        return response.readEntity(User.class);
     }
 
     public NotificationList retrieveNotifications(String client, UUID since, int size) throws HttpException {
@@ -556,7 +579,7 @@ public class API extends LoginClient implements WireAPI {
             emptyNotifications.hasMore = false;
             emptyNotifications.notifications = new ArrayList<>();
             return emptyNotifications;
-        } else if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
+        } else if (status == 401) {   // Nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
             throw new AuthException(status);
         } else if (status == 403) {
@@ -582,10 +605,17 @@ public class API extends LoginClient implements WireAPI {
 
     @Override
     public User getSelf() {
-        return selfPath.
+        Response response = selfPath.
                 request(MediaType.APPLICATION_JSON).
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
-                get(User.class);
+                get();
+
+        if (response.getStatus() >= 400) {
+            String msgError = response.readEntity(String.class);
+            Logger.error("GetSelf http error: %s, status: %d", msgError, response.getStatus());
+            throw new RuntimeException(msgError);
+        }
+        return response.readEntity(User.class);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

@@ -105,7 +105,7 @@ public class LoginClient {
 
         int status = response.getStatus();
 
-        if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
+        if (status == 401) {   // Nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
             throw new AuthException(status);
         }
@@ -175,7 +175,7 @@ public class LoginClient {
 
         int status = response.getStatus();
 
-        if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
+        if (status == 401) {   // Nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
             throw new AuthException(status);
         } else if (status >= 400) {
@@ -195,7 +195,7 @@ public class LoginClient {
 
         int status = response.getStatus();
 
-        if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
+        if (status == 401) {   // Nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
             throw new AuthException(status);
         } else if (status == 403) {
@@ -225,7 +225,7 @@ public class LoginClient {
                 .post(Entity.entity(null, MediaType.APPLICATION_JSON));
 
         int status = response.getStatus();
-        if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
+        if (status == 401) {   // Nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
             throw new AuthException(status);
         } else if (status == 403) {
@@ -248,7 +248,7 @@ public class LoginClient {
 
         int status = response.getStatus();
 
-        if (status == 401) {   //todo nginx returns text/html for 401. Cannot deserialize as json
+        if (status == 401) {   // Nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
             throw new AuthException(status);
         } else if (status >= 400) {
