@@ -12,13 +12,13 @@ public class Access {
     private Cookie cookie;
 
     @JsonProperty("user")
-    public UUID userId;
+    public UUID userId; // Access and login endpoint do not yet return users' domain
 
     @JsonProperty("access_token")
     public String accessToken;
 
     @JsonProperty("expires_in")
-    public int expiresIn;
+    public int expiresIn; // Seconds
 
     @JsonProperty("token_type")
     public String tokenType;

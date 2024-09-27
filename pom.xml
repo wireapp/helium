@@ -6,7 +6,7 @@
 
     <groupId>com.wire</groupId>
     <artifactId>helium</artifactId>
-    <version>1.3.1</version>
+    <version>1.4.0</version>
 
     <name>Helium</name>
     <description>User mode for Wire Bots</description>
@@ -58,16 +58,14 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <jersey.version>2.32</jersey.version>
-        <sl4j.version>1.7.36</sl4j.version>
-        <junit.version>5.8.2</junit.version>
+        <junit.version>5.10.2</junit.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>com.wire</groupId>
             <artifactId>xenon</artifactId>
-            <version>1.5.1</version>
+            <version>1.6.1</version>
         </dependency>
         <dependency>
             <groupId>jakarta.ws.rs</groupId>
@@ -77,41 +75,23 @@
             <version>2.1.6</version>
         </dependency>
         <dependency>
-            <groupId>org.glassfish.tyrus.bundles</groupId>
-            <artifactId>tyrus-standalone-client</artifactId>
-            <!-- This needs to stay fixed on 1.x.y version due to compatibility with dropwizard -->
-            <!--suppress MavenPackageUpdate -->
-            <version>1.13.1</version>
-        </dependency>
-        <dependency>
             <groupId>org.glassfish.jersey.core</groupId>
             <artifactId>jersey-client</artifactId>
             <!-- This needs to stay fixed on 2.x.y version due to compatibility with dropwizard -->
             <!--suppress MavenPackageUpdate -->
-            <version>${jersey.version}</version>
+            <version>2.34</version>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>8.5.12</version>
+            <version>9.22.3</version>
         </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.inject</groupId>
-            <artifactId>jersey-hk2</artifactId>
-            <!-- This needs to stay fixed on 2.x.y version due to compatibility with dropwizard -->
-            <!--suppress MavenPackageUpdate -->
-            <version>${jersey.version}</version>
-        </dependency>
+
+        <!--Test-->
         <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>${sl4j.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-            <version>${sl4j.version}</version>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.13</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -123,12 +103,12 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <version>42.3.8</version>
+            <version>42.7.3</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>junit-jupiter-api</artifactId>
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
@@ -141,7 +121,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.jaxrs</groupId>
             <artifactId>jackson-jaxrs-json-provider</artifactId>
-            <version>2.14.2</version>
+            <version>2.17.2</version>
         </dependency>
     </dependencies>
 
@@ -215,4 +195,11 @@
             </plugin>
         </plugins>
     </build>
+    <repositories>
+        <repository>
+            <id>maven_central</id>
+            <name>Maven Central</name>
+            <url>https://repo.maven.apache.org/maven2/</url>
+        </repository>
+    </repositories>
 </project>
