@@ -258,7 +258,7 @@ public class API extends LoginClient implements WireAPI {
 
         if (response.getStatus() >= 400) {
             String msgError = response.readEntity(String.class);
-            Logger.error("DownloadAsset http error %s. AssetId: %s", response.readEntity(String.class), assetKey);
+            Logger.error("DownloadAsset http error %s, status: %d. AssetId: %s", msgError, response.getStatus(), assetKey);
             throw new HttpException(msgError, response.getStatus());
         }
 
