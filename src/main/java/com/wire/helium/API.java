@@ -656,7 +656,7 @@ public class API extends LoginClient implements WireAPI {
             .header(HttpHeaders.AUTHORIZATION, bearer(token))
             .get();
 
-        if (featureConfigsResponse.getStatus() >= 400) {
+        if (isErrorResponse(featureConfigsResponse.getStatus())) {
             String msgError = featureConfigsResponse.readEntity(String.class);
             Logger.error("isMlsEnabled - Feature Configs error: %s, status: %d", msgError, featureConfigsResponse.getStatus());
             return false;
@@ -671,7 +671,7 @@ public class API extends LoginClient implements WireAPI {
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .get();
 
-            if (mlsPublicKeysResponse.getStatus() >= 400) {
+            if (isErrorResponse(featureConfigsResponse.getStatus())) {
                 String msgError = featureConfigsResponse.readEntity(String.class);
                 Logger.error("isMlsEnabled - Public Keys error: %s, status: %d", msgError, featureConfigsResponse.getStatus());
                 return false;
@@ -679,7 +679,6 @@ public class API extends LoginClient implements WireAPI {
 
             try {
                 PublicKeysResponse publicKeysResponse = mlsPublicKeysResponse.readEntity(PublicKeysResponse.class);
-
             } catch (Exception e) {
                 Logger.error("isMlsEnabled - Public Keys Deserialization error: %s", e.getMessage());
                 return false;
@@ -712,10 +711,14 @@ public class API extends LoginClient implements WireAPI {
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .put(Entity.json(clientUpdate));
 
-            if (response.getStatus() >= 400) {
-                Logger.error("uploadClientPublicKey error, bad-request");
-            } else if (response.getStatus() == 200) {
-                Logger.info("uploadClientPublicKey success");
+            if (isErrorResponse(response.getStatus())) {
+                String msgError = response.readEntity(String.class);
+                Logger.error(
+                    "uploadClientPublicKey error: %s, clientId: %s, status: %d",
+                    msgError, clientId, response.getStatus()
+                );
+            } else if(isSuccessResponse(response.getStatus())) {
+                Logger.info("uploadClientPublicKey success for clientId: %s", clientId);
             }
         } catch (Exception e) {
             Logger.error("uploadClientPublicKey error: %s", e.getMessage());
@@ -745,43 +748,44 @@ public class API extends LoginClient implements WireAPI {
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .post(Entity.json(keyPackageUpdate));
 
-            if (response.getStatus() == 403) {
-                Logger.error("uploadClientKeyPackages error, mls-identity-mismatch");
-            } else if (response.getStatus() == 400) {
-                Logger.error("uploadClientKeyPackages error, mls-protocol-error");
-            } else if (response.getStatus() == 200) {
-                Logger.error("uploadClientKeyPackages success");
+            if (isErrorResponse(response.getStatus())) {
+                String msgError = response.readEntity(String.class);
+                Logger.error(
+                    "getConversationGroupInfo error: %s, clientId: %s, status: %d",
+                    msgError, clientId, response.getStatus()
+                );
+            } else if(isSuccessResponse(response.getStatus())) {
+                Logger.info("uploadClientKeyPackages success for clientId: %s", clientId);
             }
         } catch (Exception e) {
-            Logger.error("uploadClientKeyPackages error: %s", e.getMessage());
+            Logger.error("uploadClientKeyPackages, clientId: %s, error: %s", clientId, e.getMessage());
         }
-
     }
 
     @Override
-    public byte[] getConversationGroupInfo(QualifiedId conversationId) {
-        try {
-            Response response = conversationsPath
-                .path(conversationId.domain)
-                .path(conversationId.id.toString())
-                .path("groupinfo")
-                .request(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                .accept("message/mls")
-                .get();
+    public byte[] getConversationGroupInfo(QualifiedId conversationId) throws RuntimeException {
+        Response response = conversationsPath
+            .path(conversationId.domain)
+            .path(conversationId.id.toString())
+            .path("groupinfo")
+            .request(MediaType.APPLICATION_JSON)
+            .header(HttpHeaders.AUTHORIZATION, bearer(token))
+            .accept("message/mls")
+            .get();
 
-            if (response.getStatus() == 200) {
-                return response.readEntity(byte[].class);
-            }
-
-            if (response.getStatus() >= 400) {
-                String msgError = response.readEntity(String.class);
-                Logger.error("getConversationGroupInfo error: %s, status: %d", msgError, response.getStatus());
-            }
-        } catch (Exception e) {
-            Logger.error("getConversationGroupInfo error: %s", e.getMessage());
+        if (isSuccessResponse(response.getStatus())) {
+            return response.readEntity(byte[].class);
         }
-        return new byte[0];
+
+        if (isErrorResponse(response.getStatus())) {
+            String msgError = response.readEntity(String.class);
+            Logger.error("getConversationGroupInfo error: %s, status: %d", msgError, response.getStatus());
+        }
+
+        throw new RuntimeException(
+            "getConversationGroupInfo failed",
+            new HttpException(response.readEntity(String.class), response.getStatus())
+        );
     }
 
     @Override
@@ -791,14 +795,14 @@ public class API extends LoginClient implements WireAPI {
                 .path("commit-bundles")
                 .request(MediaType.APPLICATION_JSON)
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                .post(Entity.entity(commitBundle, MediaType.APPLICATION_JSON));
+                .post(Entity.entity(commitBundle, "message/mls"));
 
-            if (response.getStatus() >= 400) {
+            if (isErrorResponse(response.getStatus())) {
                 String msgError = response.readEntity(String.class);
                 Logger.error("commitMlsBundle error: %s, status: %d", msgError, response.getStatus());
             }
 
-            if (response.getStatus() == 200) {
+            if (isSuccessResponse(response.getStatus())) {
                 Logger.info("commitMlsBundle success.");
             }
 
@@ -893,6 +897,15 @@ public class API extends LoginClient implements WireAPI {
         }
 
         return List.of();
+    }
+
+    private boolean isErrorResponse(int statusCode) {
+        return Response.Status.Family.familyOf(statusCode).equals(Response.Status.Family.CLIENT_ERROR)
+            || Response.Status.Family.familyOf(statusCode).equals(Response.Status.Family.SERVER_ERROR);
+    }
+
+    private boolean isSuccessResponse(int statusCode) {
+        return Response.Status.Family.familyOf(statusCode).equals(Response.Status.Family.SUCCESSFUL);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
