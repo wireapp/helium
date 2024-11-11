@@ -12,6 +12,7 @@ import com.wire.xenon.assets.MessageText;
 import com.wire.xenon.backend.models.NewBot;
 import com.wire.xenon.backend.models.QualifiedId;
 import com.wire.xenon.crypto.CryptoDatabase;
+import com.wire.xenon.crypto.mls.CryptoMlsClient;
 import com.wire.xenon.crypto.storage.JdbiStorage;
 import com.wire.xenon.models.otr.OtrMessage;
 import org.junit.jupiter.api.AfterEach;
@@ -31,6 +32,7 @@ public class End2EndTest extends DatabaseTestBase {
     public void beforeEach() {
         rootFolder = "helium-unit-test-" + UUID.randomUUID();
         storage = new JdbiStorage(jdbi);
+
     }
 
     @AfterEach
@@ -49,11 +51,12 @@ public class End2EndTest extends DatabaseTestBase {
 
         CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, rootFolder + "/testAliceToAlice/1");
         CryptoDatabase aliceCrypto1 = new CryptoDatabase(aliceId, storage, rootFolder + "/testAliceToAlice/2");
+        CryptoMlsClient cryptoMlsClient = new CryptoMlsClient(client1, client1 + "_db_key");
 
         DummyAPI api = new DummyAPI();
         api.addDevice(aliceId, client1, aliceCrypto1.box().newLastPreKey());
 
-        WireClient aliceClient = new WireClientBase(api, aliceCrypto, state);
+        WireClient aliceClient = new WireClientBase(api, aliceCrypto, cryptoMlsClient, state);
 
         for (int i = 0; i < 10; i++) {
             String text = "Hello Alice, This is Alice!";
@@ -78,6 +81,7 @@ public class End2EndTest extends DatabaseTestBase {
 
         CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, rootFolder + "/testAliceToBob");
         CryptoDatabase bobCrypto = new CryptoDatabase(bobId, storage, rootFolder + "/testAliceToBob");
+        CryptoMlsClient cryptoMlsClient = new CryptoMlsClient(client1, client1 + "_db_key");
 
         DummyAPI api = new DummyAPI();
         api.addDevice(bobId, client1, bobCrypto.box().newLastPreKey());
@@ -85,7 +89,7 @@ public class End2EndTest extends DatabaseTestBase {
         NewBot state = new NewBot();
         state.id = aliceId.id;
         state.client = "alice1";
-        WireClient aliceClient = new WireClientBase(api, aliceCrypto, state);
+        WireClient aliceClient = new WireClientBase(api, aliceCrypto, cryptoMlsClient, state);
 
         for (int i = 0; i < 10; i++) {
             String text = "Hello Bob, This is Alice!";
@@ -112,6 +116,7 @@ public class End2EndTest extends DatabaseTestBase {
         CryptoDatabase aliceCrypto1 = new CryptoDatabase(aliceId, storage, rootFolder + "/testMultiDevicePostgres/alice/1");
         CryptoDatabase bobCrypto1 = new CryptoDatabase(bobId, storage, rootFolder + "/testMultiDevicePostgres/bob/1");
         CryptoDatabase bobCrypto2 = new CryptoDatabase(bobId, storage, rootFolder + "/testMultiDevicePostgres/bob/2");
+        CryptoMlsClient cryptoMlsClient = new CryptoMlsClient(client1, client1 + "_db_key");
 
         DummyAPI api = new DummyAPI();
         api.addDevice(bobId, client1, bobCrypto1.box().newLastPreKey());
@@ -123,7 +128,7 @@ public class End2EndTest extends DatabaseTestBase {
         NewBot state = new NewBot();
         state.id = aliceId.id;
         state.client = aliceCl;
-        WireClient aliceClient = new WireClientBase(api, aliceCrypto, state);
+        WireClient aliceClient = new WireClientBase(api, aliceCrypto, cryptoMlsClient, state);
 
         for (int i = 0; i < 10; i++) {
             String text = "Hello Bob, This is Alice!";

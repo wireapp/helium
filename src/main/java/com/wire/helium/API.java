@@ -22,14 +22,18 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.protobuf.ByteString;
 import com.wire.helium.models.Connection;
+import com.wire.helium.models.model.response.FeatureConfig;
 import com.wire.helium.models.NotificationList;
+import com.wire.helium.models.model.response.PublicKeysResponse;
+import com.wire.helium.models.model.request.ConversationListPaginationConfig;
+import com.wire.helium.models.model.request.ConversationListRequest;
+import com.wire.helium.models.model.response.ConversationListIdsResponse;
+import com.wire.helium.models.model.response.ConversationListResponse;
 import com.wire.messages.Otr;
 import com.wire.xenon.WireAPI;
 import com.wire.xenon.assets.IAsset;
-import com.wire.xenon.backend.models.Conversation;
-import com.wire.xenon.backend.models.Member;
-import com.wire.xenon.backend.models.QualifiedId;
-import com.wire.xenon.backend.models.User;
+import com.wire.xenon.backend.KeyPackageUpdate;
+import com.wire.xenon.backend.models.*;
 import com.wire.xenon.exceptions.AuthException;
 import com.wire.xenon.exceptions.HttpException;
 import com.wire.xenon.models.AssetKey;
@@ -53,6 +57,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 public class API extends LoginClient implements WireAPI {
+    private final WebTarget versionedPath;
     private final WebTarget conversationsPath;
     private final WebTarget usersPath;
     private final WebTarget assetsPath;
@@ -60,6 +65,8 @@ public class API extends LoginClient implements WireAPI {
     private final WebTarget connectionsPath;
     private final WebTarget selfPath;
     private final WebTarget notificationsPath;
+    private final WebTarget clientsPath;
+    private final WebTarget mlsPath;
 
     private final String token;
     private final QualifiedId convId;
@@ -71,6 +78,7 @@ public class API extends LoginClient implements WireAPI {
         this.token = token;
 
         WebTarget versionedTarget = client.target(host()).path(BACKEND_API_VERSION);
+        versionedPath = versionedTarget;
 
         conversationsPath = versionedTarget.path("conversations");
         usersPath = versionedTarget.path("users");
@@ -79,6 +87,8 @@ public class API extends LoginClient implements WireAPI {
         connectionsPath = versionedTarget.path("connections");
         selfPath = versionedTarget.path("self");
         notificationsPath = versionedTarget.path("notifications");
+        clientsPath = versionedTarget.path("clients");
+        mlsPath = versionedTarget.path("mls");
     }
 
     /**
@@ -347,12 +357,7 @@ public class API extends LoginClient implements WireAPI {
             throw new RuntimeException(msgError);
         }
 
-        _Conv conv = response.readEntity(_Conv.class);
-        Conversation ret = new Conversation();
-        ret.name = conv.name;
-        ret.id = conv.id;
-        ret.members = conv.members.others;
-        return ret;
+        return response.readEntity(Conversation.class);
     }
 
     @Override
@@ -436,13 +441,7 @@ public class API extends LoginClient implements WireAPI {
             throw new HttpException(msgError, response.getStatus());
         }
 
-        _Conv conv = response.readEntity(_Conv.class);
-
-        Conversation ret = new Conversation();
-        ret.name = conv.name;
-        ret.id = conv.id;
-        ret.members = conv.members.others;
-        return ret;
+        return response.readEntity(Conversation.class);
     }
 
     @Override
@@ -467,13 +466,7 @@ public class API extends LoginClient implements WireAPI {
             throw new HttpException(msgError, response.getStatus());
         }
 
-        _Conv conv = response.readEntity(_Conv.class);
-
-        Conversation ret = new Conversation();
-        ret.name = conv.name;
-        ret.id = conv.id;
-        ret.members = conv.members.others;
-        return ret;
+        return response.readEntity(Conversation.class);
     }
 
     @Override
@@ -618,24 +611,290 @@ public class API extends LoginClient implements WireAPI {
         return response.readEntity(User.class);
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class _Conv {
-        @JsonProperty("qualified_conversation")
-        public QualifiedId id;
+    /**
+     * <p>
+     *     To verify if MLS is enabled we need to go through 2 requests. They are:
+     * </p>
+     * <p>
+     *     First: from GET /feature-configs there will be a `mls` object containing a `status` of type boolean
+     * </p>
+     * <p>
+     *     Second: from GET /mls/public/keys returning a `removal` object containing public keys
+     * </p>
+     * <p>
+     *     If the first value is false, then we already return a `false` value.
+     *     If the first value is true, then we do the second request, in case it returns a 200 HTTP Code then MLS is
+     *     enabled and we can return a `true` value.
+     *     <br />
+     *     In case any of those requests fail (with HTTP Code >= 400) then we assume it is not enabled and log the error.
+     * </p>
+     *
+     * @return boolean
+     */
+    @Override
+    public boolean isMlsEnabled() {
+        Response featureConfigsResponse = versionedPath
+            .path("feature-configs")
+            .request(MediaType.APPLICATION_JSON)
+            .header(HttpHeaders.AUTHORIZATION, bearer(token))
+            .get();
 
-        @JsonProperty
-        public String name;
+        if (isErrorResponse(featureConfigsResponse.getStatus())) {
+            String msgError = featureConfigsResponse.readEntity(String.class);
+            Logger.error("isMlsEnabled - Feature Configs error: %s, status: %d", msgError, featureConfigsResponse.getStatus());
+            return false;
+        }
 
-        @JsonProperty
-        public _Members members;
+        FeatureConfig featureConfig = featureConfigsResponse.readEntity(FeatureConfig.class);
+
+        if (featureConfig.mls.isMlsStatusEnabled()) {
+            Response mlsPublicKeysResponse = mlsPath
+                .path("public-keys")
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                .get();
+
+            if (isErrorResponse(featureConfigsResponse.getStatus())) {
+                String msgError = featureConfigsResponse.readEntity(String.class);
+                Logger.error("isMlsEnabled - Public Keys error: %s, status: %d", msgError, featureConfigsResponse.getStatus());
+                return false;
+            }
+
+            try {
+                PublicKeysResponse publicKeysResponse = mlsPublicKeysResponse.readEntity(PublicKeysResponse.class);
+            } catch (Exception e) {
+                Logger.error("isMlsEnabled - Public Keys Deserialization error: %s", e.getMessage());
+                return false;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class _Members {
-        @JsonProperty
-        public List<Member> others;
+    /**
+     * <p>
+     *     To upload client public key we PUT a {@link ClientUpdate} object containing the public keys
+     *     to /clients/{clientId}
+     * </p>
+     * <p>
+     *     As there is no return, in case it fails we just map the HTTP Code and log the message.
+     * </p>
+     *
+     * @param clientId      clientId to upload the public keys
+     * @param clientUpdate  the public keys
+     */
+    @Override
+    public void uploadClientPublicKey(String clientId, ClientUpdate clientUpdate) {
+        try {
+            Response response = clientsPath
+                .path(clientId)
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                .put(Entity.json(clientUpdate));
+
+            if (isErrorResponse(response.getStatus())) {
+                String msgError = response.readEntity(String.class);
+                Logger.error(
+                    "uploadClientPublicKey error: %s, clientId: %s, status: %d",
+                    msgError, clientId, response.getStatus()
+                );
+            } else if(isSuccessResponse(response.getStatus())) {
+                Logger.info("uploadClientPublicKey success for clientId: %s", clientId);
+            }
+        } catch (Exception e) {
+            Logger.error("uploadClientPublicKey error: %s", e.getMessage());
+        }
     }
 
+    /**
+     * <p>
+     *     To upload client key packages we POST a {@link KeyPackageUpdate} object containing a list of package keys
+     *     to /mls/key-packages/self/{clientId}
+     * </p>
+     * <p>
+     *     As there is no return, in case it fails we just map the HTTP Code and log the message.
+     * </p>
+     *
+     * @param clientId          clientId to upload the package keys
+     * @param keyPackageUpdate  list of package keys
+     */
+    @Override
+    public void uploadClientKeyPackages(String clientId, KeyPackageUpdate keyPackageUpdate) {
+        try {
+            Response response = mlsPath
+                .path("key-packages")
+                .path("self")
+                .path(clientId)
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                .post(Entity.json(keyPackageUpdate));
+
+            if (isErrorResponse(response.getStatus())) {
+                String msgError = response.readEntity(String.class);
+                Logger.error(
+                    "getConversationGroupInfo error: %s, clientId: %s, status: %d",
+                    msgError, clientId, response.getStatus()
+                );
+            } else if(isSuccessResponse(response.getStatus())) {
+                Logger.info("uploadClientKeyPackages success for clientId: %s", clientId);
+            }
+        } catch (Exception e) {
+            Logger.error("uploadClientKeyPackages, clientId: %s, error: %s", clientId, e.getMessage());
+        }
+    }
+
+    @Override
+    public byte[] getConversationGroupInfo(QualifiedId conversationId) throws RuntimeException {
+        Response response = conversationsPath
+            .path(conversationId.domain)
+            .path(conversationId.id.toString())
+            .path("groupinfo")
+            .request(MediaType.APPLICATION_JSON)
+            .header(HttpHeaders.AUTHORIZATION, bearer(token))
+            .accept("message/mls")
+            .get();
+
+        if (isSuccessResponse(response.getStatus())) {
+            return response.readEntity(byte[].class);
+        }
+
+        if (isErrorResponse(response.getStatus())) {
+            String msgError = response.readEntity(String.class);
+            Logger.error("getConversationGroupInfo error: %s, status: %d", msgError, response.getStatus());
+        }
+
+        throw new RuntimeException(
+            "getConversationGroupInfo failed",
+            new HttpException(response.readEntity(String.class), response.getStatus())
+        );
+    }
+
+    @Override
+    public void commitMlsBundle(byte[] commitBundle) {
+        try {
+            Response response = mlsPath
+                .path("commit-bundles")
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                .post(Entity.entity(commitBundle, "message/mls"));
+
+            if (isErrorResponse(response.getStatus())) {
+                String msgError = response.readEntity(String.class);
+                Logger.error("commitMlsBundle error: %s, status: %d", msgError, response.getStatus());
+            }
+
+            if (isSuccessResponse(response.getStatus())) {
+                Logger.info("commitMlsBundle success.");
+            }
+
+        } catch (Exception e) {
+            Logger.error("commitMlsBundle error: %s", e.getMessage());
+        }
+    }
+
+    /**
+     * <p>
+     *     In order to get user conversations, first we need to get all the paginated conversation ids.
+     * </p>
+     * <p>
+     *     For getting the conversation details, we need to do a "paginated" request, as the backend has a limit of
+     *     1000 conversation ids per request.
+     * </p>
+     *
+     * @return List of {@link Conversation} details from the fetched conversation ids.
+     */
+    @Override
+    public List<Conversation> getUserConversations() {
+        ConversationListPaginationConfig pagingConfig = new ConversationListPaginationConfig(
+            null,
+            100
+        );
+
+        List<QualifiedId> conversationIds = new ArrayList<>();
+        List<Conversation> conversations = new ArrayList<>();
+
+        boolean hasMorePages;
+        do {
+            hasMorePages = false;
+
+            Response listIdsResponse = conversationsPath
+                .path("list-ids")
+                .request(MediaType.APPLICATION_JSON)
+                .header(HttpHeaders.AUTHORIZATION, bearer(token))
+                .post(Entity.entity(pagingConfig, MediaType.APPLICATION_JSON));
+
+            if (listIdsResponse.getStatus() >= 400) {
+                String msgError = listIdsResponse.readEntity(String.class);
+                Logger.error("getUserConversations - List Ids error: %s, status: %d", msgError, listIdsResponse.getStatus());
+            }
+
+            if (listIdsResponse.getStatus() == 200) {
+                ConversationListIdsResponse conversationListIds = listIdsResponse.readEntity(ConversationListIdsResponse.class);
+                hasMorePages = conversationListIds.hasMore;
+                pagingConfig.setPagingState(conversationListIds.pagingState);
+
+                conversationIds.addAll(conversationListIds.qualifiedConversations);
+
+                Logger.info("getUserConversations - List Ids success. has more pages: " + hasMorePages);
+            }
+        } while (hasMorePages);
+
+        if (!conversationIds.isEmpty()) {
+            int startIndex = 0;
+            int endIndex = 1000;
+            do {
+                if (endIndex > conversationIds.size()) {
+                    endIndex = conversationIds.size();
+                }
+
+                conversations.addAll(getConversationsFromIds(conversationIds.subList(startIndex, endIndex)));
+                startIndex += 1000;
+                endIndex += 1000;
+            } while (endIndex < conversationIds.size() + 1000);
+        }
+
+        return conversations;
+    }
+
+    private List<Conversation> getConversationsFromIds(List<QualifiedId> conversationIds) {
+        Response conversationListResponse = conversationsPath
+            .path("/list")
+            .request(MediaType.APPLICATION_JSON)
+            .header(HttpHeaders.AUTHORIZATION, bearer(token))
+            .post(Entity.entity(
+                new ConversationListRequest(conversationIds),
+                MediaType.APPLICATION_JSON
+            ));
+
+        if (conversationListResponse.getStatus() == 200) {
+            ConversationListResponse result = conversationListResponse.readEntity(ConversationListResponse.class);
+
+            return result.found;
+        }
+
+        if (conversationListResponse.getStatus() >= 400) {
+            String msgError = conversationListResponse.readEntity(String.class);
+            Logger.error("getUserConversations - Conversation List error: %s, status: %d", msgError, conversationListResponse.getStatus());
+        }
+
+        return List.of();
+    }
+
+    private boolean isErrorResponse(int statusCode) {
+        return Response.Status.Family.familyOf(statusCode).equals(Response.Status.Family.CLIENT_ERROR)
+            || Response.Status.Family.familyOf(statusCode).equals(Response.Status.Family.SERVER_ERROR);
+    }
+
+    private boolean isSuccessResponse(int statusCode) {
+        return Response.Status.Family.familyOf(statusCode).equals(Response.Status.Family.SUCCESSFUL);
+    }
+
+    /**
+     * @deprecated This class is deprecated and in case there is any work related to _Service,
+     * {@link Service} can be used instead.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class _Service {
         public UUID service;
