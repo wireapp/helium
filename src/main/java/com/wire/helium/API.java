@@ -357,12 +357,7 @@ public class API extends LoginClient implements WireAPI {
             throw new RuntimeException(msgError);
         }
 
-        _Conv conv = response.readEntity(_Conv.class);
-        Conversation ret = new Conversation();
-        ret.name = conv.name;
-        ret.id = conv.id;
-        ret.members = conv.members.others;
-        return ret;
+        return response.readEntity(Conversation.class);
     }
 
     @Override
@@ -446,13 +441,7 @@ public class API extends LoginClient implements WireAPI {
             throw new HttpException(msgError, response.getStatus());
         }
 
-        _Conv conv = response.readEntity(_Conv.class);
-
-        Conversation ret = new Conversation();
-        ret.name = conv.name;
-        ret.id = conv.id;
-        ret.members = conv.members.others;
-        return ret;
+        return response.readEntity(Conversation.class);
     }
 
     @Override
@@ -477,13 +466,7 @@ public class API extends LoginClient implements WireAPI {
             throw new HttpException(msgError, response.getStatus());
         }
 
-        _Conv conv = response.readEntity(_Conv.class);
-
-        Conversation ret = new Conversation();
-        ret.name = conv.name;
-        ret.id = conv.id;
-        ret.members = conv.members.others;
-        return ret;
+        return response.readEntity(Conversation.class);
     }
 
     @Override
@@ -908,24 +891,10 @@ public class API extends LoginClient implements WireAPI {
         return Response.Status.Family.familyOf(statusCode).equals(Response.Status.Family.SUCCESSFUL);
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class _Conv {
-        @JsonProperty("qualified_conversation")
-        public QualifiedId id;
-
-        @JsonProperty
-        public String name;
-
-        @JsonProperty
-        public _Members members;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static class _Members {
-        @JsonProperty
-        public List<Member> others;
-    }
-
+    /**
+     * @deprecated This class is deprecated and in case there is any work related to _Service,
+     * {@link Service} can be used instead.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class _Service {
         public UUID service;

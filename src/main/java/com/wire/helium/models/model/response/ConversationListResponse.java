@@ -12,7 +12,6 @@ public class ConversationListResponse {
     @JsonProperty("failed")
     public List<QualifiedId> failed;
 
-    // TODO(WPB-12040): possible issue with members returning as object(others[], self{}) and we expect a list?
     @JsonProperty("found")
     public List<Conversation> found;
 
