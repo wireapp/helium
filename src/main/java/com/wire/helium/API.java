@@ -654,9 +654,9 @@ public class API extends LoginClient implements WireAPI {
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .get();
 
-            if (isErrorResponse(featureConfigsResponse.getStatus())) {
-                String msgError = featureConfigsResponse.readEntity(String.class);
-                Logger.error("isMlsEnabled - Public Keys error: %s, status: %d", msgError, featureConfigsResponse.getStatus());
+            if (isErrorResponse(mlsPublicKeysResponse.getStatus())) {
+                String msgError = mlsPublicKeysResponse.readEntity(String.class);
+                Logger.error("isMlsEnabled - Public Keys error: %s, status: %d", msgError, mlsPublicKeysResponse.getStatus());
                 return false;
             }
 
@@ -684,27 +684,27 @@ public class API extends LoginClient implements WireAPI {
      *
      * @param clientId      clientId to upload the public keys
      * @param clientUpdate  the public keys
+     * @throws RuntimeException if the request fails
      */
     @Override
-    public void uploadClientPublicKey(String clientId, ClientUpdate clientUpdate) {
-        try {
-            Response response = clientsPath
-                .path(clientId)
-                .request(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                .put(Entity.json(clientUpdate));
+    public void uploadClientPublicKey(String clientId, ClientUpdate clientUpdate) throws RuntimeException {
+        Response response = clientsPath
+            .path(clientId)
+            .request(MediaType.APPLICATION_JSON)
+            .header(HttpHeaders.AUTHORIZATION, bearer(token))
+            .put(Entity.json(clientUpdate));
 
-            if (isErrorResponse(response.getStatus())) {
-                String msgError = response.readEntity(String.class);
-                Logger.error(
-                    "uploadClientPublicKey error: %s, clientId: %s, status: %d",
-                    msgError, clientId, response.getStatus()
-                );
-            } else if(isSuccessResponse(response.getStatus())) {
-                Logger.info("uploadClientPublicKey success for clientId: %s", clientId);
-            }
-        } catch (Exception e) {
-            Logger.error("uploadClientPublicKey error: %s", e.getMessage());
+        if (isErrorResponse(response.getStatus())) {
+            String errorResponse = response.readEntity(String.class);
+            String errorMessage = String.format(
+                "uploadClientPublicKey error: %s, clientId: %s, status: %d",
+                errorResponse, clientId, response.getStatus()
+            );
+
+            Logger.error(errorMessage);
+            throw new RuntimeException(errorResponse);
+        } else if(isSuccessResponse(response.getStatus())) {
+            Logger.info("uploadClientPublicKey success for clientId: %s", clientId);
         }
     }
 
@@ -719,29 +719,29 @@ public class API extends LoginClient implements WireAPI {
      *
      * @param clientId          clientId to upload the package keys
      * @param keyPackageUpdate  list of package keys
+     * @throws RuntimeException if the request fails
      */
     @Override
-    public void uploadClientKeyPackages(String clientId, KeyPackageUpdate keyPackageUpdate) {
-        try {
-            Response response = mlsPath
-                .path("key-packages")
-                .path("self")
-                .path(clientId)
-                .request(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                .post(Entity.json(keyPackageUpdate));
+    public void uploadClientKeyPackages(String clientId, KeyPackageUpdate keyPackageUpdate) throws RuntimeException {
+        Response response = mlsPath
+            .path("key-packages")
+            .path("self")
+            .path(clientId)
+            .request(MediaType.APPLICATION_JSON)
+            .header(HttpHeaders.AUTHORIZATION, bearer(token))
+            .post(Entity.json(keyPackageUpdate));
 
-            if (isErrorResponse(response.getStatus())) {
-                String msgError = response.readEntity(String.class);
-                Logger.error(
-                    "getConversationGroupInfo error: %s, clientId: %s, status: %d",
-                    msgError, clientId, response.getStatus()
-                );
-            } else if(isSuccessResponse(response.getStatus())) {
-                Logger.info("uploadClientKeyPackages success for clientId: %s", clientId);
-            }
-        } catch (Exception e) {
-            Logger.error("uploadClientKeyPackages, clientId: %s, error: %s", clientId, e.getMessage());
+        if (isErrorResponse(response.getStatus())) {
+            String errorResponse = response.readEntity(String.class);
+            String errorMessage = String.format(
+                "getConversationGroupInfo error: %s, clientId: %s, status: %d",
+                errorResponse, clientId, response.getStatus()
+            );
+
+            Logger.error(errorMessage);
+            throw new RuntimeException(errorResponse);
+        } else if(isSuccessResponse(response.getStatus())) {
+            Logger.info("uploadClientKeyPackages success for clientId: %s", clientId);
         }
     }
 
@@ -760,38 +760,33 @@ public class API extends LoginClient implements WireAPI {
             return response.readEntity(byte[].class);
         }
 
+        String errorResponse = response.readEntity(String.class);
         if (isErrorResponse(response.getStatus())) {
-            String msgError = response.readEntity(String.class);
-            Logger.error("getConversationGroupInfo error: %s, status: %d", msgError, response.getStatus());
+            Logger.error("getConversationGroupInfo error: %s, status: %d", errorResponse, response.getStatus());
         }
 
-        throw new RuntimeException(
-            "getConversationGroupInfo failed",
-            new HttpException(response.readEntity(String.class), response.getStatus())
-        );
+        throw new RuntimeException(errorResponse);
     }
 
     @Override
     public void commitMlsBundle(byte[] commitBundle) {
-        try {
-            Response response = mlsPath
-                .path("commit-bundles")
-                .request(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                .post(Entity.entity(commitBundle, "message/mls"));
+        Response response = mlsPath
+            .path("commit-bundles")
+            .request(MediaType.APPLICATION_JSON)
+            .header(HttpHeaders.AUTHORIZATION, bearer(token))
+            .post(Entity.entity(commitBundle, "message/mls"));
 
-            if (isErrorResponse(response.getStatus())) {
-                String msgError = response.readEntity(String.class);
-                Logger.error("commitMlsBundle error: %s, status: %d", msgError, response.getStatus());
-            }
-
-            if (isSuccessResponse(response.getStatus())) {
-                Logger.info("commitMlsBundle success.");
-            }
-
-        } catch (Exception e) {
-            Logger.error("commitMlsBundle error: %s", e.getMessage());
+        if (isSuccessResponse(response.getStatus())) {
+            Logger.info("commitMlsBundle success.");
+            return;
         }
+
+        String errorResponse = response.readEntity(String.class);
+        if (isErrorResponse(response.getStatus())) {
+            Logger.error("commitMlsBundle error: %s, status: %d", errorResponse, response.getStatus());
+        }
+
+        throw new RuntimeException(errorResponse);
     }
 
     /**
@@ -825,12 +820,12 @@ public class API extends LoginClient implements WireAPI {
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .post(Entity.entity(pagingConfig, MediaType.APPLICATION_JSON));
 
-            if (listIdsResponse.getStatus() >= 400) {
+            if (isErrorResponse(listIdsResponse.getStatus())) {
                 String msgError = listIdsResponse.readEntity(String.class);
                 Logger.error("getUserConversations - List Ids error: %s, status: %d", msgError, listIdsResponse.getStatus());
             }
 
-            if (listIdsResponse.getStatus() == 200) {
+            if (isSuccessResponse(listIdsResponse.getStatus())) {
                 ConversationListIdsResponse conversationListIds = listIdsResponse.readEntity(ConversationListIdsResponse.class);
                 hasMorePages = conversationListIds.hasMore;
                 pagingConfig.setPagingState(conversationListIds.pagingState);
