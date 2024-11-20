@@ -6,7 +6,7 @@
 
     <groupId>com.wire</groupId>
     <artifactId>helium</artifactId>
-    <version>1.5.0</version>
+    <version>1.5.1</version>
 
     <name>Helium</name>
     <description>User mode for Wire Bots</description>
@@ -65,7 +65,7 @@
         <dependency>
             <groupId>com.wire</groupId>
             <artifactId>xenon</artifactId>
-            <version>1.7.0</version>
+            <version>1.7.1</version>
         </dependency>
         <dependency>
             <groupId>jakarta.ws.rs</groupId>
