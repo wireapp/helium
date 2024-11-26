@@ -370,12 +370,13 @@ public class API extends LoginClient implements WireAPI {
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 delete();
 
-        if (response.getStatus() >= 400) {
+        if (isErrorResponse(response.getStatus())) {
             String msgError = response.readEntity(String.class);
             Logger.error("DeleteConversation http error: %s, status: %d", msgError, response.getStatus());
             throw new HttpException(msgError, response.getStatus());
         }
 
+        response.close();
         return response.getStatus() == 200;
     }
 
@@ -393,11 +394,13 @@ public class API extends LoginClient implements WireAPI {
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 post(Entity.entity(service, MediaType.APPLICATION_JSON));
 
-        if (response.getStatus() >= 400) {
+        if (isErrorResponse(response.getStatus())) {
             String msgError = response.readEntity(String.class);
             Logger.error("AddService http error: %s, status: %d", msgError, response.getStatus());
             throw new HttpException(msgError, response.getStatus());
         }
+
+        response.close();
     }
 
     @Override
@@ -413,11 +416,13 @@ public class API extends LoginClient implements WireAPI {
                 header(HttpHeaders.AUTHORIZATION, bearer(token)).
                 post(Entity.entity(newConv, MediaType.APPLICATION_JSON));
 
-        if (response.getStatus() >= 400) {
+        if (isErrorResponse(response.getStatus())) {
             String msgError = response.readEntity(String.class);
             Logger.error("AddParticipants http error: %s, status: %d", msgError, response.getStatus());
             throw new HttpException(msgError, response.getStatus());
         }
+
+        response.close();
     }
 
     @Override
@@ -481,11 +486,13 @@ public class API extends LoginClient implements WireAPI {
                 .header(HttpHeaders.AUTHORIZATION, bearer(token))
                 .delete();
 
-        if (response.getStatus() >= 400) {
+        if (isErrorResponse(response.getStatus())) {
             String msgError = response.readEntity(String.class);
             Logger.error("LeaveConversation http error: %s, status: %d", msgError, response.getStatus());
             throw new HttpException(msgError, response.getStatus());
         }
+
+        response.close();
     }
 
     /**
@@ -571,6 +578,7 @@ public class API extends LoginClient implements WireAPI {
             final NotificationList emptyNotifications = new NotificationList();
             emptyNotifications.hasMore = false;
             emptyNotifications.notifications = new ArrayList<>();
+            response.close();
             return emptyNotifications;
         } else if (status == 401) {   // Nginx returns text/html for 401. Cannot deserialize as json
             response.readEntity(String.class);
@@ -703,9 +711,10 @@ public class API extends LoginClient implements WireAPI {
 
             Logger.error(errorMessage);
             throw new RuntimeException(errorResponse);
-        } else if(isSuccessResponse(response.getStatus())) {
-            Logger.info("uploadClientPublicKey success for clientId: %s", clientId);
         }
+
+        Logger.info("uploadClientPublicKey success for clientId: %s", clientId);
+        response.close();
     }
 
     /**
@@ -734,15 +743,16 @@ public class API extends LoginClient implements WireAPI {
         if (isErrorResponse(response.getStatus())) {
             String errorResponse = response.readEntity(String.class);
             String errorMessage = String.format(
-                "getConversationGroupInfo error: %s, clientId: %s, status: %d",
+                "uploadClientKeyPackages error: %s, clientId: %s, status: %d",
                 errorResponse, clientId, response.getStatus()
             );
 
             Logger.error(errorMessage);
             throw new RuntimeException(errorResponse);
-        } else if(isSuccessResponse(response.getStatus())) {
-            Logger.info("uploadClientKeyPackages success for clientId: %s", clientId);
         }
+
+        Logger.info("uploadClientKeyPackages success for clientId: %s", clientId);
+        response.close();
     }
 
     @Override
@@ -778,6 +788,7 @@ public class API extends LoginClient implements WireAPI {
 
         if (isSuccessResponse(response.getStatus())) {
             Logger.info("commitMlsBundle success.");
+            response.close();
             return;
         }
 

@@ -233,6 +233,8 @@ public class LoginClient {
         } else if (status >= 400) {
             throw response.readEntity(HttpException.class);
         }
+
+        response.close();
     }
 
     public void removeCookies(String token, String password) throws HttpException {
@@ -255,6 +257,7 @@ public class LoginClient {
             throw response.readEntity(HttpException.class);
         }
 
+        response.close();
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
