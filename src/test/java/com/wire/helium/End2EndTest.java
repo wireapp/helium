@@ -51,7 +51,7 @@ public class End2EndTest extends DatabaseTestBase {
 
         CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, rootFolder + "/testAliceToAlice/1");
         CryptoDatabase aliceCrypto1 = new CryptoDatabase(aliceId, storage, rootFolder + "/testAliceToAlice/2");
-        CryptoMlsClient cryptoMlsClient = new CryptoMlsClient(client1, client1 + "_db_key");
+        CryptoMlsClient cryptoMlsClient = new CryptoMlsClient(client1, aliceId, client1 + "_db_key");
 
         DummyAPI api = new DummyAPI();
         api.addDevice(aliceId, client1, aliceCrypto1.box().newLastPreKey());
@@ -81,7 +81,7 @@ public class End2EndTest extends DatabaseTestBase {
 
         CryptoDatabase aliceCrypto = new CryptoDatabase(aliceId, storage, rootFolder + "/testAliceToBob");
         CryptoDatabase bobCrypto = new CryptoDatabase(bobId, storage, rootFolder + "/testAliceToBob");
-        CryptoMlsClient cryptoMlsClient = new CryptoMlsClient(client1, client1 + "_db_key");
+        CryptoMlsClient cryptoMlsClient = new CryptoMlsClient(client1, bobId,  client1 + "_db_key");
 
         DummyAPI api = new DummyAPI();
         api.addDevice(bobId, client1, bobCrypto.box().newLastPreKey());
@@ -116,7 +116,7 @@ public class End2EndTest extends DatabaseTestBase {
         CryptoDatabase aliceCrypto1 = new CryptoDatabase(aliceId, storage, rootFolder + "/testMultiDevicePostgres/alice/1");
         CryptoDatabase bobCrypto1 = new CryptoDatabase(bobId, storage, rootFolder + "/testMultiDevicePostgres/bob/1");
         CryptoDatabase bobCrypto2 = new CryptoDatabase(bobId, storage, rootFolder + "/testMultiDevicePostgres/bob/2");
-        CryptoMlsClient cryptoMlsClient = new CryptoMlsClient(client1, client1 + "_db_key");
+        CryptoMlsClient cryptoMlsClient = new CryptoMlsClient(client1, bobId, client1 + "_db_key");
 
         DummyAPI api = new DummyAPI();
         api.addDevice(bobId, client1, bobCrypto1.box().newLastPreKey());
