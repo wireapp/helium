@@ -22,13 +22,13 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.protobuf.ByteString;
 import com.wire.helium.models.Connection;
-import com.wire.helium.models.model.response.FeatureConfig;
 import com.wire.helium.models.NotificationList;
-import com.wire.helium.models.model.response.PublicKeysResponse;
 import com.wire.helium.models.model.request.ConversationListPaginationConfig;
 import com.wire.helium.models.model.request.ConversationListRequest;
 import com.wire.helium.models.model.response.ConversationListIdsResponse;
 import com.wire.helium.models.model.response.ConversationListResponse;
+import com.wire.helium.models.model.response.FeatureConfig;
+import com.wire.helium.models.model.response.PublicKeysResponse;
 import com.wire.messages.Otr;
 import com.wire.xenon.WireAPI;
 import com.wire.xenon.assets.IAsset;
@@ -93,14 +93,13 @@ public class API extends LoginClient implements WireAPI {
 
     /**
      * Sends E2E encrypted messages to all clients already known, with opened cryptobox sessions.
-     *
      * After sending those, the backend will return the list of clients that the service has no connection yet,
      * so prekeys for those specific clients can be downloaded a new cryptobox sessions initiated.
      * @param msg the message with the already encrypted clients
      * @param ignoreMissing when true, missing clients won't be blocking and just be returned,
      *                      when false, any missing recipient will block the message to be sent to anyone
      * @return devices that had issues or still need the message
-     * @throws HttpException
+     * @throws HttpException on any error response from the backend
      */
     @Override
     public Devices sendMessage(OtrMessage msg, boolean ignoreMissing) throws HttpException {
@@ -137,13 +136,12 @@ public class API extends LoginClient implements WireAPI {
 
     /**
      * Sends E2E encrypted messages to all clients already known, with opened cryptobox sessions.
-     *
      * After sending those, the backend will return the list of clients that the service has no connection yet,
      * so prekeys for those specific clients can be downloaded a new cryptobox sessions initiated.
      * @param msg the message with the already encrypted clients
      * @param userId If this users' client is missing, the message is not sent
      * @return devices that had issues or still need the message
-     * @throws HttpException
+     * @throws HttpException on any error response from the backend
      */
     @Override
     public Devices sendPartialMessage(OtrMessage msg, QualifiedId userId) throws HttpException {
@@ -669,7 +667,7 @@ public class API extends LoginClient implements WireAPI {
             }
 
             try {
-                PublicKeysResponse publicKeysResponse = mlsPublicKeysResponse.readEntity(PublicKeysResponse.class);
+                mlsPublicKeysResponse.readEntity(PublicKeysResponse.class);
             } catch (Exception e) {
                 Logger.error("isMlsEnabled - Public Keys Deserialization error: %s", e.getMessage());
                 return false;
@@ -761,7 +759,7 @@ public class API extends LoginClient implements WireAPI {
             .path(conversationId.domain)
             .path(conversationId.id.toString())
             .path("groupinfo")
-            .request(MediaType.APPLICATION_JSON)
+            .request()
             .header(HttpHeaders.AUTHORIZATION, bearer(token))
             .accept("message/mls")
             .get();

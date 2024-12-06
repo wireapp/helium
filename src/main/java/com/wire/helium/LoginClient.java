@@ -185,10 +185,11 @@ public class LoginClient {
         return response.readEntity(_Client.class).id;
     }
 
-    public Access renewAccessToken(Cookie cookie) throws HttpException {
+    public Access renewAccessToken(String clientId, Cookie cookie) throws HttpException {
         Invocation.Builder builder = accessPath
-                .request(MediaType.APPLICATION_JSON)
-                .cookie(cookie);
+            .queryParam("client_id", clientId)
+            .request(MediaType.APPLICATION_JSON)
+            .cookie(cookie);
 
         Response response = builder.
                 post(Entity.entity(null, MediaType.APPLICATION_JSON));
