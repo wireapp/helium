@@ -27,7 +27,6 @@ import com.wire.helium.models.model.request.ConversationListPaginationConfig;
 import com.wire.helium.models.model.request.ConversationListRequest;
 import com.wire.helium.models.model.response.ConversationListIdsResponse;
 import com.wire.helium.models.model.response.ConversationListResponse;
-import com.wire.helium.models.model.response.FeatureConfig;
 import com.wire.helium.models.model.response.PublicKeysResponse;
 import com.wire.messages.Otr;
 import com.wire.xenon.WireAPI;
@@ -638,7 +637,7 @@ public class API extends LoginClient implements WireAPI {
      * @return boolean
      */
     @Override
-    public boolean isMlsEnabled() {
+    public FeatureConfig getFeatureConfig() {
         Response featureConfigsResponse = versionedPath
             .path("feature-configs")
             .request(MediaType.APPLICATION_JSON)
@@ -648,35 +647,35 @@ public class API extends LoginClient implements WireAPI {
         if (isErrorResponse(featureConfigsResponse.getStatus())) {
             String msgError = featureConfigsResponse.readEntity(String.class);
             Logger.error("isMlsEnabled - Feature Configs error: %s, status: %d", msgError, featureConfigsResponse.getStatus());
-            return false;
+            return FeatureConfig.disabledMls();
         }
 
         FeatureConfig featureConfig = featureConfigsResponse.readEntity(FeatureConfig.class);
 
-        if (featureConfig.mls.isMlsStatusEnabled()) {
-            Response mlsPublicKeysResponse = mlsPath
-                .path("public-keys")
-                .request(MediaType.APPLICATION_JSON)
-                .header(HttpHeaders.AUTHORIZATION, bearer(token))
-                .get();
-
-            if (isErrorResponse(mlsPublicKeysResponse.getStatus())) {
-                String msgError = mlsPublicKeysResponse.readEntity(String.class);
-                Logger.error("isMlsEnabled - Public Keys error: %s, status: %d", msgError, mlsPublicKeysResponse.getStatus());
-                return false;
-            }
-
-            try {
-                mlsPublicKeysResponse.readEntity(PublicKeysResponse.class);
-            } catch (Exception e) {
-                Logger.error("isMlsEnabled - Public Keys Deserialization error: %s", e.getMessage());
-                return false;
-            }
-
-            return true;
+        if (!featureConfig.mls.isMlsStatusEnabled()) {
+            return FeatureConfig.disabledMls();
         }
 
-        return false;
+        Response mlsPublicKeysResponse = mlsPath
+            .path("public-keys")
+            .request(MediaType.APPLICATION_JSON)
+            .header(HttpHeaders.AUTHORIZATION, bearer(token))
+            .get();
+
+        if (isErrorResponse(mlsPublicKeysResponse.getStatus())) {
+            String msgError = mlsPublicKeysResponse.readEntity(String.class);
+            Logger.error("isMlsEnabled - Public Keys error: %s, status: %d", msgError, mlsPublicKeysResponse.getStatus());
+            return FeatureConfig.disabledMls();
+        }
+
+        try {
+            mlsPublicKeysResponse.readEntity(PublicKeysResponse.class); // The presence of the needed fields in the response is proof of MLS being online
+        } catch (Exception e) {
+            Logger.error("isMlsEnabled - Public Keys Deserialization error: %s", e.getMessage());
+            return FeatureConfig.disabledMls();
+        }
+
+        return featureConfig;
     }
 
     /**
